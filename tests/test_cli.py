@@ -63,3 +63,10 @@ def test_format_bad_raises():
     from mysterio.cli import _format_payload
     with pytest.raises(Exception):
         _format_payload("x", "yaml")
+
+
+def test_encode_all_previews_every_codec():
+    result = runner.invoke(app, ["encode", "pay", "-m", "all"])
+    assert result.exit_code == 0
+    for name in ["circle", "zwsp", "base64", "morse"]:
+        assert name in result.output

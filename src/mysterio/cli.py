@@ -108,9 +108,22 @@ def encode(
         None, "--out", "-o", help="Write to file instead of stdout"
     ),
 ) -> None:
-    """Transform text with an encoder/decoder."""
+    """Transform text with an encoder/decoder. Use -m all to preview every codec."""
     if text == "-":
         text = sys.stdin.read()
+    if method == "all":
+        table = Table(title=f"all encoders on {text[:40]!r}")
+        table.add_column("codec", style="cyan")
+        table.add_column("category", style="magenta")
+        table.add_column("output")
+        for c in E.CODECS.values():
+            rendered = c.encode(text)
+            shown = repr(rendered) if c.category == "invisible" else rendered
+            if len(shown) > 72:
+                shown = shown[:69] + "..."
+            table.add_row(c.name, c.category, shown)
+        console.print(table)
+        return
     if method not in E.CODECS:
         err_console.print(f"unknown method {method!r}; see `mysterio encoders`")
         raise typer.Exit(2)
