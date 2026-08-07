@@ -393,6 +393,14 @@ def diff(
 
 
 @app.command()
+def lab() -> None:
+    """Open the interactive payload workbench (TUI)."""
+    from .lab import run
+
+    run()
+
+
+@app.command()
 def stats(
     path: Optional[Path] = typer.Argument(
         None, help="File to measure (omit/'-' for stdin)"
