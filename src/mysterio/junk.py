@@ -194,3 +194,15 @@ STYLES: dict[str, JunkStyle] = {
 
 def generate(style: str, **kwargs: object) -> str:
     return STYLES[style].generate(**kwargs)
+
+
+def lines_for_tokens(style: str, approx_tokens: int, seed: str = "cal") -> int:
+    """Resolve a token budget to a line/row count by self-calibration:
+    generate a probe, estimate tokens as chars/4, scale to the target."""
+    if style == "base64":
+        probe = gen_base64_blob(size=320, seed=seed)
+        per_unit = len(probe) / 4 / 10  # 320 bytes ~ 10 wrapped rows
+        return max(1, round(approx_tokens / per_unit))
+    probe = STYLES[style].generate(lines=10, seed=seed)
+    per_line = len(probe) / 4 / 10
+    return max(1, round(approx_tokens / per_line))

@@ -23,6 +23,14 @@ console = Console()
 err_console = Console(stderr=True)
 
 
+def _emit(text: str, out: Optional[Path]) -> None:
+    if out is None:
+        print(text)
+    else:
+        out.write_text(text + "\n", encoding="utf-8")
+        err_console.print(f"wrote {out} ({len(text):,} chars)")
+
+
 def _parse_sets(sets: list[str]) -> dict[str, str]:
     out: dict[str, str] = {}
     for item in sets:
@@ -37,17 +45,29 @@ def _parse_sets(sets: list[str]) -> dict[str, str]:
 def junk(
     style: str = typer.Argument(..., help="Junk style (see `mysterio styles`)"),
     lines: int = typer.Option(140, "--lines", "-n", help="Line count (or rows)"),
+    approx_tokens: Optional[int] = typer.Option(
+        None,
+        "--approx-tokens",
+        "-t",
+        help="Token budget — resolved to lines by self-calibration (overrides --lines)",
+    ),
     seed: str = typer.Option("rsc-chunk", "--seed", "-s", help="Deterministic seed"),
+    out: Optional[Path] = typer.Option(
+        None, "--out", "-o", help="Write to file instead of stdout"
+    ),
 ) -> None:
     """Print context-noise to stdout."""
     if style not in J.STYLES:
         err_console.print(f"unknown style {style!r}; see `mysterio styles`")
         raise typer.Exit(2)
+    if approx_tokens is not None:
+        lines = J.lines_for_tokens(style, approx_tokens, seed)
+        err_console.print(f"~{approx_tokens} tokens -> {lines} lines")
     gen = J.STYLES[style].generate
     if style == "base64":
-        print(gen(size=lines * 32, seed=seed))
+        _emit(gen(size=lines * 32, seed=seed), out)
     else:
-        print(gen(lines=lines, seed=seed))
+        _emit(gen(lines=lines, seed=seed), out)
 
 
 @app.command()
@@ -68,6 +88,9 @@ def encode(
         ..., "--method", "-m", help="Codec name (see `mysterio encoders`)"
     ),
     decode: bool = typer.Option(False, "--decode", "-d", help="Reverse the transform"),
+    out: Optional[Path] = typer.Option(
+        None, "--out", "-o", help="Write to file instead of stdout"
+    ),
 ) -> None:
     """Transform text with an encoder/decoder."""
     if text == "-":
@@ -77,12 +100,12 @@ def encode(
         raise typer.Exit(2)
     if decode:
         try:
-            print(E.decode(method, text))
+            _emit(E.decode(method, text), out)
         except ValueError as e:
             err_console.print(str(e))
             raise typer.Exit(2) from e
     else:
-        print(E.encode(method, text))
+        _emit(E.encode(method, text), out)
 
 
 @app.command()
@@ -102,23 +125,31 @@ def encoders() -> None:
 def build(
     recipe_path: Path = typer.Argument(..., help="Path to a recipe YAML"),
     sets: list[str] = typer.Option([], "--set", help="Slot substitution key=value"),
+    out: Optional[Path] = typer.Option(
+        None, "--out", "-o", help="Write to file instead of stdout"
+    ),
 ) -> None:
     """Assemble a chassis from a recipe file."""
     recipe = R.load_recipe_file(recipe_path)
-    print(R.assemble(recipe, _parse_sets(sets)))
+    _emit(R.assemble(recipe, _parse_sets(sets)), out)
 
 
 @app.command("use")
 def use(
-    name: str = typer.Argument(..., help="Library payload name (see `mysterio library`)"),
+    name: str = typer.Argument(
+        ..., help="Library payload name (see `mysterio library`)"
+    ),
     sets: list[str] = typer.Option([], "--set", help="Slot substitution key=value"),
+    out: Optional[Path] = typer.Option(
+        None, "--out", "-o", help="Write to file instead of stdout"
+    ),
 ) -> None:
     """Render a payload from the library."""
     library = R.load_library()
     if name not in library:
         err_console.print(f"no library payload {name!r}; see `mysterio library`")
         raise typer.Exit(2)
-    print(R.assemble(library[name], _parse_sets(sets)))
+    _emit(R.assemble(library[name], _parse_sets(sets)), out)
 
 
 @app.command()
