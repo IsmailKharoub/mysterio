@@ -29,15 +29,15 @@ from . import encoders as E
 
 
 def library_dir() -> Path:
-    """Resolution order: $PF_LIBRARY, ./library, ~/.config/payload-forge/library,
+    """Resolution order: $MYSTERIO_LIBRARY, ./library, ~/.config/mysterio/library,
     package-relative (dev repo)."""
-    env = os.environ.get("PF_LIBRARY")
+    env = os.environ.get("MYSTERIO_LIBRARY")
     if env:
         return Path(env)
     cwd = Path.cwd() / "library"
     if cwd.is_dir():
         return cwd
-    xdg = Path.home() / ".config" / "payload-forge" / "library"
+    xdg = Path.home() / ".config" / "mysterio" / "library"
     if xdg.is_dir():
         return xdg
     return Path(__file__).resolve().parents[2] / "library"

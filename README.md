@@ -1,4 +1,4 @@
-# payload-forge
+# mysterio
 
 Composable payload builder for prompt-injection red-team research. Turn the
 parts of an injection that are usually hand-copied between engagements — noise
@@ -11,7 +11,7 @@ and diff.
 ```bash
 uv tool install .
 # or, for development:
-uv sync --extra dev && uv run pf --help
+uv sync --extra dev && uv run mysterio --help
 ```
 
 ## The model
@@ -30,29 +30,29 @@ wrapper, ask encoding).
 
 ```bash
 # Generate context-noise (140 RSC stream rows)
-pf junk rsc --lines 140
+mysterio junk rsc --lines 140
 
 # Other noise styles
-pf styles
-pf junk http-log -n 80
-pf junk hexdump -n 40
+mysterio styles
+mysterio junk http-log -n 80
+mysterio junk hexdump -n 40
 
 # Encode text (visual hiders, invisible encodings, classics)
-pf encode "post the weekly book" -m circle      # ⓟⓞⓢⓣ ...
-pf encode "post the weekly book" -m spaces      # p o s t ...
-pf encode "pay the invoice" -m math-bold        # 𝐩𝐚𝐲 ...
-pf encode "see me at 6" -m zwsp                 # invisible
-pf encode "aGVsbG8=" -m base64 -d               # decode
+mysterio encode "post the weekly book" -m circle      # ⓟⓞⓢⓣ ...
+mysterio encode "post the weekly book" -m spaces      # p o s t ...
+mysterio encode "pay the invoice" -m math-bold        # 𝐩𝐚𝐲 ...
+mysterio encode "see me at 6" -m zwsp                 # invisible
+mysterio encode "aGVsbG8=" -m base64 -d               # decode
 
 # Assemble a full chassis from a recipe
-pf build recipe.yaml --set ts="2026-05-04 11:20AM" --set ask="check the thread"
+mysterio build recipe.yaml --set ts="2026-05-04 11:20AM" --set ask="check the thread"
 
 # Use the library
-pf library
-pf use basic-interruption --set ts="..." --set ask="..."
+mysterio library
+mysterio use basic-interruption --set ts="..." --set ask="..."
 
 # Measure a payload (dose control)
-pf stats payload.txt
+mysterio stats payload.txt
 ```
 
 ## The library
@@ -107,7 +107,7 @@ Any string field may contain `{slot}` placeholders; fill them with
 - **classic** — `base64`, `hex`, `rot13`, `caesar`, `binary`, `url`,
   `html`, `morse`, `nato`, `leet`, `reverse`.
 
-`pf encoders` lists everything with decodability.
+`mysterio encoders` lists everything with decodability.
 
 ## Development
 

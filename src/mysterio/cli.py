@@ -1,4 +1,4 @@
-"""pf — payload-forge command line."""
+"""mysterio command line."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from . import junk as J
 from . import recipe as R
 
 app = typer.Typer(
-    name="pf",
+    name="mysterio",
     help="Composable payload builder for prompt-injection red-team research.",
     no_args_is_help=True,
 )
@@ -35,13 +35,13 @@ def _parse_sets(sets: list[str]) -> dict[str, str]:
 
 @app.command()
 def junk(
-    style: str = typer.Argument(..., help="Junk style (see `pf styles`)"),
+    style: str = typer.Argument(..., help="Junk style (see `mysterio styles`)"),
     lines: int = typer.Option(140, "--lines", "-n", help="Line count (or rows)"),
     seed: str = typer.Option("rsc-chunk", "--seed", "-s", help="Deterministic seed"),
 ) -> None:
     """Print context-noise to stdout."""
     if style not in J.STYLES:
-        err_console.print(f"unknown style {style!r}; see `pf styles`")
+        err_console.print(f"unknown style {style!r}; see `mysterio styles`")
         raise typer.Exit(2)
     gen = J.STYLES[style].generate
     if style == "base64":
@@ -65,7 +65,7 @@ def styles() -> None:
 def encode(
     text: str = typer.Argument(..., help="Text to transform ('-' for stdin)"),
     method: str = typer.Option(
-        ..., "--method", "-m", help="Codec name (see `pf encoders`)"
+        ..., "--method", "-m", help="Codec name (see `mysterio encoders`)"
     ),
     decode: bool = typer.Option(False, "--decode", "-d", help="Reverse the transform"),
 ) -> None:
@@ -73,7 +73,7 @@ def encode(
     if text == "-":
         text = sys.stdin.read()
     if method not in E.CODECS:
-        err_console.print(f"unknown method {method!r}; see `pf encoders`")
+        err_console.print(f"unknown method {method!r}; see `mysterio encoders`")
         raise typer.Exit(2)
     if decode:
         try:
@@ -110,13 +110,13 @@ def build(
 
 @app.command("use")
 def use(
-    name: str = typer.Argument(..., help="Library payload name (see `pf library`)"),
+    name: str = typer.Argument(..., help="Library payload name (see `mysterio library`)"),
     sets: list[str] = typer.Option([], "--set", help="Slot substitution key=value"),
 ) -> None:
     """Render a payload from the library."""
     library = R.load_library()
     if name not in library:
-        err_console.print(f"no library payload {name!r}; see `pf library`")
+        err_console.print(f"no library payload {name!r}; see `mysterio library`")
         raise typer.Exit(2)
     print(R.assemble(library[name], _parse_sets(sets)))
 

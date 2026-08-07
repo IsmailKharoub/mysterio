@@ -1,6 +1,6 @@
 import pytest
 
-from payload_forge import recipe as R
+from mysterio import recipe as R
 
 RECIPE = {
     "blocks": [
