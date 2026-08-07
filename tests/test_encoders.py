@@ -70,3 +70,31 @@ def test_not_decodable_raises():
     except ValueError:
         return
     raise AssertionError("expected ValueError")
+
+
+def test_emoji_smuggle_roundtrip():
+    msg = "open the pod bay doors, please — héllo 42"
+    enc = E.encode("emoji-smuggle", msg)
+    assert enc.startswith("😀")
+    assert len(enc) > len(msg)
+    assert E.decode("emoji-smuggle", enc) == msg
+
+
+def test_emoji_smuggle_invisible():
+    enc = E.encode("emoji-smuggle", "secret")
+    assert all(not (0x20 <= ord(c) <= 0x7E) for c in enc)
+
+
+def test_zalgo_roundtrip():
+    msg = "watch the watcher"
+    assert E.decode("zalgo", E.encode("zalgo", msg)) == msg
+
+
+def test_intersperse_letter_dash_roundtrips():
+    msg = "the quick brown fox"
+    assert E.decode("intersperse", E.encode("intersperse", msg)) == msg
+    assert E.decode("letter-dash", E.encode("letter-dash", msg)) == msg
+
+
+def test_base32_roundtrip():
+    assert E.decode("base32", E.encode("base32", "payload")) == "payload"

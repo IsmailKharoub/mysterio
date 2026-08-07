@@ -249,6 +249,27 @@ def _dec_tag(text: str) -> str:
     return "".join(out)
 
 
+def _enc_emoji_smuggle(text: str) -> str:
+    # Paul Butler's variation-selector encoding: byte b -> U+FE00+b (b<16)
+    # else U+E0100+(b-16). Invisible after any base emoji; guardrail
+    # tokenizers strip them, target models still tokenize the bytes.
+    out = ["😀"]
+    for b in text.encode("utf-8"):
+        out.append(chr(0xFE00 + b) if b < 16 else chr(0xE0100 + b - 16))
+    return "".join(out)
+
+
+def _dec_emoji_smuggle(text: str) -> str:
+    data = bytearray()
+    for ch in text:
+        cp = ord(ch)
+        if 0xFE00 <= cp <= 0xFE0F:
+            data.append(cp - 0xFE00)
+        elif 0xE0100 <= cp <= 0xE01EF:
+            data.append(cp - 0xE0100 + 16)
+    return data.decode("utf-8")
+
+
 # --------------------------------------------------------------------------
 # homoglyphs (visual spoofing — looks identical, compares different)
 
@@ -351,6 +372,51 @@ _LEET = {
     "g": "9",
     "b": "8",
 }
+
+
+_ZALGO_MARKS = [chr(c) for c in range(0x0300, 0x0370)]
+
+
+def _enc_zalgo(text: str, seed: int = 7) -> str:
+    import random as _r
+
+    rng = _r.Random(seed)
+    out = []
+    for ch in text:
+        out.append(ch)
+        if not ch.isspace():
+            out.extend(rng.choice(_ZALGO_MARKS) for _ in range(rng.randint(1, 3)))
+    return "".join(out)
+
+
+def _dec_zalgo(text: str) -> str:
+    return "".join(ch for ch in text if not 0x0300 <= ord(ch) <= 0x036F)
+
+
+def _enc_intersperse(text: str) -> str:
+    # word-level underscore interleave — defeats marking-style defenses that
+    # prepend a sentinel to every word (Prompt Infection countermeasure)
+    return " _ ".join(text.split(" "))
+
+
+def _dec_intersperse(text: str) -> str:
+    return text.replace(" _ ", " ")
+
+
+def _enc_letter_dash(text: str) -> str:
+    return " ".join("-".join(word) for word in text.split(" "))
+
+
+def _dec_letter_dash(text: str) -> str:
+    return " ".join(w.replace("-", "") for w in text.split(" "))
+
+
+def _enc_base32(text: str) -> str:
+    return base64.b32encode(text.encode()).decode()
+
+
+def _dec_base32(text: str) -> str:
+    return base64.b32decode(text.encode()).decode()
 
 
 def _enc_morse(text: str) -> str:
@@ -590,6 +656,35 @@ _reg("morse", _enc_morse, _dec_morse, "classic", "Morse code")
 _reg("nato", _enc_nato, _dec_nato, "classic", "NATO phonetic alphabet")
 _reg("leet", _map_encode(_LEET), None, "classic", "Leetspeak substitutions")
 _reg("reverse", lambda s: s[::-1], lambda s: s[::-1], "classic", "Reverse the string")
+_reg(
+    "emoji-smuggle",
+    _enc_emoji_smuggle,
+    _dec_emoji_smuggle,
+    "invisible",
+    "Variation-selector byte encoding on a base emoji (Butler 2025) — guardrail-blind",
+)
+_reg(
+    "zalgo",
+    _enc_zalgo,
+    _dec_zalgo,
+    "visual",
+    "Combining-mark stack over every character (visual chaos hider)",
+)
+_reg(
+    "intersperse",
+    _enc_intersperse,
+    _dec_intersperse,
+    "classic",
+    "Underscore between words — defeats marking defenses (Prompt Infection 2024)",
+)
+_reg(
+    "letter-dash",
+    _enc_letter_dash,
+    _dec_letter_dash,
+    "classic",
+    "Hyphen between letters (token-smuggling style)",
+)
+_reg("base32", _enc_base32, _dec_base32, "classic", "Base32")
 
 
 def encode(name: str, text: str) -> str:
