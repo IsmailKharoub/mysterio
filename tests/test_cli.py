@@ -120,3 +120,30 @@ def test_diff_aligns_on_insert():
     assert (
         "1 block-level change(s)" in result.output
     )  # only the added junk, no positional cascade
+
+
+def test_show_prints_references():
+    result = runner.invoke(app, ["show", "chatml-user-spoof"])
+    assert result.exit_code == 0
+    assert "2509.22830" in result.output
+
+
+def test_library_patterns_assemble():
+    from mysterio import recipe as R
+    library = R.load_library()
+    for name in ["chatml-user-spoof", "emoji-smuggle-note", "markdown-exfil"]:
+        out = R.assemble(library[name], {
+            "ask": "do the thing",
+            "document_body": "quarterly report body text",
+            "collector": "telemetry.example",
+        })
+        assert len(out) > 10, name
+
+
+def test_emoji_smuggle_pattern_roundtrips():
+    from mysterio import recipe as R
+    from mysterio import encoders as E
+    library = R.load_library()
+    out = R.assemble(library["emoji-smuggle-note"], {"ask": "post the draft"})
+    assert "😀" in out
+    assert "post the draft" in E.decode("emoji-smuggle", out)

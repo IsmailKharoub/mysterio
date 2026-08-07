@@ -189,6 +189,32 @@ def use(
 
 
 @app.command()
+def show(
+    name: str = typer.Argument(..., help="Library payload name"),
+) -> None:
+    """Inspect a library entry: description, references, full recipe."""
+    import yaml as _yaml
+
+    library = R.load_library()
+    if name not in library:
+        err_console.print(f"no library payload {name!r}; see `mysterio library`")
+        raise typer.Exit(2)
+    entry = library[name]
+    console.print(
+        f"[cyan bold]{name}[/cyan bold]  [dim]({entry.get('_source', '?')})[/dim]"
+    )
+    console.print(str(entry.get("description", "")))
+    refs = entry.get("references", [])
+    if refs:
+        console.print("\n[bold]references[/bold]")
+        for ref in refs:
+            console.print(f"  - {ref}")
+    console.print("\n[bold]recipe[/bold]")
+    printable = {k: v for k, v in entry.items() if not k.startswith("_")}
+    console.print(_yaml.safe_dump(printable, sort_keys=False).strip())
+
+
+@app.command()
 def library() -> None:
     """List library payloads (local/private entries included)."""
     library = R.load_library()
