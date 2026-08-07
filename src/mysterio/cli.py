@@ -14,6 +14,7 @@ from . import encoders as E
 from . import junk as J
 from . import lint as L
 from . import recipe as R
+from . import vary as V
 
 app = typer.Typer(
     name="mysterio",
@@ -207,6 +208,63 @@ def check(
     console.print(table)
     if any(f.level == "error" for f in findings):
         raise typer.Exit(1)
+
+
+@app.command()
+def vary(
+    target: str = typer.Argument(..., help="Recipe YAML path, or library payload name"),
+    varies: list[str] = typer.Option(
+        [], "--vary", "-v", help="Sweep spec kind.field=v1,v2,... (repeatable)"
+    ),
+    zip_mode: bool = typer.Option(
+        False, "--zip", help="Pair values positionally instead of cross product"
+    ),
+    sets: list[str] = typer.Option([], "--set", help="Slot substitution key=value"),
+    out_dir: Optional[Path] = typer.Option(
+        None, "--out-dir", help="Write arms here (omit for dry run)"
+    ),
+    recipes: bool = typer.Option(
+        False, "--recipes", help="Write arm recipe YAMLs instead of rendered payloads"
+    ),
+) -> None:
+    """Sweep one or more recipe fields and emit one arm per combination."""
+    import yaml as _yaml
+
+    path = Path(target)
+    if path.is_file():
+        recipe = R.load_recipe_file(path)
+    else:
+        library = R.load_library()
+        if target not in library:
+            err_console.print(f"{target!r} is neither a file nor a library payload")
+            raise typer.Exit(2)
+        recipe = library[target]
+
+    try:
+        arms = V.vary_recipe(recipe, varies, zip_mode)
+    except ValueError as e:
+        err_console.print(str(e))
+        raise typer.Exit(2) from e
+
+    slots = _parse_sets(sets)
+    if out_dir is None:
+        table = Table(
+            title=f"vary: {len(arms)} arm(s) (dry run — pass --out-dir to write)"
+        )
+        table.add_column("arm", style="cyan")
+        for label, _ in arms:
+            table.add_row(label)
+        console.print(table)
+        return
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for label, arm in arms:
+        dest = out_dir / (f"{label}.yaml" if recipes else f"{label}.txt")
+        if recipes:
+            dest.write_text(_yaml.safe_dump(arm, sort_keys=False), encoding="utf-8")
+        else:
+            dest.write_text(R.assemble(arm, slots) + "\n", encoding="utf-8")
+        err_console.print(f"wrote {dest}")
 
 
 @app.command()
