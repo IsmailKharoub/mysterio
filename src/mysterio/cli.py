@@ -300,6 +300,47 @@ def vary(
         err_console.print(f"wrote {dest}")
 
 
+def _resolve_recipe(target: str) -> tuple[dict, str]:
+    path = Path(target)
+    if path.is_file():
+        return R.load_recipe_file(path), str(path)
+    library = R.load_library()
+    if target not in library:
+        raise typer.BadParameter(f"{target!r} is neither a file nor a library payload")
+    return library[target], f"library:{target}"
+
+
+@app.command()
+def diff(
+    left: str = typer.Argument(..., help="Left recipe (file or library name)"),
+    right: str = typer.Argument(..., help="Right recipe (file or library name)"),
+) -> None:
+    """Block-level diff between two recipes."""
+    import yaml as _yaml
+
+    la, lsrc = _resolve_recipe(left)
+    ra, rsrc = _resolve_recipe(right)
+    lb = la.get("blocks", [])
+    rb = ra.get("blocks", [])
+
+    table = Table(title=f"diff: {lsrc} vs {rsrc}")
+    table.add_column("block", justify="right")
+    table.add_column("left", style="cyan")
+    table.add_column("right", style="green")
+    changed = 0
+    for i in range(max(len(lb), len(rb))):
+        l = _yaml.safe_dump(lb[i], sort_keys=False).strip() if i < len(lb) else "—"
+        r = _yaml.safe_dump(rb[i], sort_keys=False).strip() if i < len(rb) else "—"
+        if l != r:
+            changed += 1
+            table.add_row(str(i + 1), l, r)
+    if changed:
+        console.print(table)
+        console.print(f"{changed} block(s) differ")
+    else:
+        console.print("recipes are block-identical")
+
+
 @app.command()
 def stats(
     path: Optional[Path] = typer.Argument(

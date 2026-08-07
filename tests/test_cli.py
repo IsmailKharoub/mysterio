@@ -70,3 +70,23 @@ def test_encode_all_previews_every_codec():
     assert result.exit_code == 0
     for name in ["circle", "zwsp", "base64", "morse"]:
         assert name in result.output
+
+
+def test_diff_identical_recipes(tmp_path):
+    import yaml
+    r = {"blocks": [{"junk": {"style": "rsc", "lines": 140}}]}
+    a = tmp_path / "a.yaml"; b = tmp_path / "b.yaml"
+    a.write_text(yaml.safe_dump(r), encoding="utf-8")
+    b.write_text(yaml.safe_dump(r), encoding="utf-8")
+    result = runner.invoke(app, ["diff", str(a), str(b)])
+    assert result.exit_code == 0
+    assert "block-identical" in result.output
+
+
+def test_diff_detects_changed_block(tmp_path):
+    import yaml
+    a = tmp_path / "a.yaml"; b = tmp_path / "b.yaml"
+    a.write_text(yaml.safe_dump({"blocks": [{"junk": {"style": "rsc", "lines": 60}}]}), encoding="utf-8")
+    b.write_text(yaml.safe_dump({"blocks": [{"junk": {"style": "rsc", "lines": 140}}]}), encoding="utf-8")
+    result = runner.invoke(app, ["diff", str(a), str(b)])
+    assert "1 block(s) differ" in result.output
