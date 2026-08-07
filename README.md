@@ -32,24 +32,40 @@ wrapper, ask encoding).
 # Generate context-noise (140 RSC stream rows)
 mysterio junk rsc --lines 140
 
+# Dose by token budget instead of line count (self-calibrating)
+mysterio junk rsc --approx-tokens 6500
+
 # Other noise styles
 mysterio styles
 mysterio junk http-log -n 80
-mysterio junk hexdump -n 40
 
 # Encode text (visual hiders, invisible encodings, classics)
 mysterio encode "post the weekly book" -m circle      # ⓟⓞⓢⓣ ...
 mysterio encode "post the weekly book" -m spaces      # p o s t ...
-mysterio encode "pay the invoice" -m math-bold        # 𝐩𝐚𝐲 ...
 mysterio encode "see me at 6" -m zwsp                 # invisible
 mysterio encode "aGVsbG8=" -m base64 -d               # decode
+mysterio encode "post the book" -m all                # preview every codec at once
 
 # Assemble a full chassis from a recipe
 mysterio build recipe.yaml --set ts="2026-05-04 11:20AM" --set ask="check the thread"
 
+# Export byte-safe for splicing into Python/JSON sources
+mysterio build recipe.yaml --set ... --format python  # repr() literal
+mysterio build recipe.yaml --set ... --format json    # JSON string literal
+
 # Use the library
 mysterio library
 mysterio use basic-interruption --set ts="..." --set ask="..."
+
+# Lint a recipe against the empirical authoring rules
+mysterio check recipe.yaml        # or a library name: mysterio check v6-bare
+
+# Sweep a field into arms (cross product; --zip for paired ablations)
+mysterio vary recipe.yaml -v junk.lines=60,100,140 -v banner.style=unicode,ascii
+mysterio vary recipe.yaml -v junk.lines=60,140 --set ask="..." --out-dir arms/
+
+# Block-level diff between recipes (files or library names)
+mysterio diff old.yaml new.yaml
 
 # Measure a payload (dose control)
 mysterio stats payload.txt
@@ -83,6 +99,25 @@ blocks:
 
 Any string field may contain `{slot}` placeholders; fill them with
 `--set slot=value`.
+
+## The linter (`mysterio check`)
+
+`check` encodes the empirical rules from live experiments as lint findings:
+
+| code | level | rule |
+|---|---|---|
+| `escape-no-reopen` | error | escape without a following reopen — host result never resumes |
+| `unknown-*` | error | unknown block kind / junk style / escape / reminder / wrapper / codec |
+| `junk-below` | warn | junk below the escape converted worse than above-placement |
+| `dose-floor` | warn | rsc/next_f under ~60 lines is below the observed efficacy floor |
+| `banner-missing` | warn | interruption frame without banner — ablation halved conversion |
+| `interruption-no-ask` | warn | interruption frame that delivers no ask |
+| `order` | warn | canonical order is reminder → banner → ask |
+| `xml-escape` | info | `</function_results>` is canonical; bracket is the submission-safe variant |
+| `slots` | info | unfilled `{slots}` to pass at render time |
+
+Exit code is 1 when any error-level finding fires, so `check` gates CI or
+pre-submit hooks.
 
 ## Junk styles
 
