@@ -12,6 +12,7 @@ from rich.table import Table
 
 from . import encoders as E
 from . import junk as J
+from . import lint as L
 from . import recipe as R
 
 app = typer.Typer(
