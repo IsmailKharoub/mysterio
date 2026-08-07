@@ -175,6 +175,40 @@ def library() -> None:
 
 
 @app.command()
+def check(
+    target: str = typer.Argument(..., help="Recipe YAML path, or library payload name"),
+) -> None:
+    """Lint a recipe against the empirical authoring rules."""
+    path = Path(target)
+    if path.is_file():
+        recipe = R.load_recipe_file(path)
+        source = str(path)
+    else:
+        library = R.load_library()
+        if target not in library:
+            err_console.print(f"{target!r} is neither a file nor a library payload")
+            raise typer.Exit(2)
+        recipe = library[target]
+        source = f"library:{target}"
+
+    findings = L.lint_recipe(recipe)
+    table = Table(title=f"check: {source}")
+    table.add_column("level")
+    table.add_column("code", style="cyan")
+    table.add_column("message")
+    level_style = {"error": "red", "warn": "yellow", "info": "dim"}
+    for f in findings:
+        table.add_row(
+            f"[{level_style[f.level]}]{f.level}[/{level_style[f.level]}]",
+            f.code,
+            f.message,
+        )
+    console.print(table)
+    if any(f.level == "error" for f in findings):
+        raise typer.Exit(1)
+
+
+@app.command()
 def stats(
     path: Optional[Path] = typer.Argument(
         None, help="File to measure (omit/'-' for stdin)"
