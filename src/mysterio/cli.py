@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import sys
 from pathlib import Path
 from typing import Optional
@@ -323,20 +324,44 @@ def diff(
     lb = la.get("blocks", [])
     rb = ra.get("blocks", [])
 
+    def kind(b: object) -> str:
+        return next(iter(b)) if isinstance(b, dict) and b else "?"
+
+    lk = [kind(b) for b in lb]
+    rk = [kind(b) for b in rb]
+    sm = difflib.SequenceMatcher(a=lk, b=rk)
+
     table = Table(title=f"diff: {lsrc} vs {rsrc}")
-    table.add_column("block", justify="right")
+    table.add_column("block", style="dim")
+    table.add_column("change", style="yellow")
     table.add_column("left", style="cyan")
     table.add_column("right", style="green")
     changed = 0
-    for i in range(max(len(lb), len(rb))):
-        l = _yaml.safe_dump(lb[i], sort_keys=False).strip() if i < len(lb) else "—"
-        r = _yaml.safe_dump(rb[i], sort_keys=False).strip() if i < len(rb) else "—"
-        if l != r:
-            changed += 1
-            table.add_row(str(i + 1), l, r)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            for i, j in zip(range(i1, i2), range(j1, j2)):
+                l = _yaml.safe_dump(lb[i], sort_keys=False).strip()
+                r = _yaml.safe_dump(rb[j], sort_keys=False).strip()
+                if l != r:
+                    changed += 1
+                    table.add_row(lk[i], "modified", l, r)
+        else:
+            for i in range(i1, i2):
+                changed += 1
+                table.add_row(
+                    lk[i],
+                    "removed",
+                    _yaml.safe_dump(lb[i], sort_keys=False).strip(),
+                    "—",
+                )
+            for j in range(j1, j2):
+                changed += 1
+                table.add_row(
+                    rk[j], "added", "—", _yaml.safe_dump(rb[j], sort_keys=False).strip()
+                )
     if changed:
         console.print(table)
-        console.print(f"{changed} block(s) differ")
+        console.print(f"{changed} block-level change(s)")
     else:
         console.print("recipes are block-identical")
 

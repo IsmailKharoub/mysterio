@@ -45,6 +45,7 @@ def test_unknown_style_exit_2():
 def test_format_python_roundtrip(tmp_path):
     from mysterio.cli import _format_payload
     import ast
+
     payload = 'line1\nline2 with "quotes" and ⓤⓃⓘⓒⓞⓓⓔ \\ backslash'
     rendered = _format_payload(payload, "python")
     assert ast.literal_eval(rendered) == payload
@@ -54,6 +55,7 @@ def test_format_python_roundtrip(tmp_path):
 def test_format_json_roundtrip():
     import json
     from mysterio.cli import _format_payload
+
     payload = "a\nb\tc"
     assert json.loads(_format_payload(payload, "json")) == payload
 
@@ -61,6 +63,7 @@ def test_format_json_roundtrip():
 def test_format_bad_raises():
     import pytest
     from mysterio.cli import _format_payload
+
     with pytest.raises(Exception):
         _format_payload("x", "yaml")
 
@@ -74,8 +77,10 @@ def test_encode_all_previews_every_codec():
 
 def test_diff_identical_recipes(tmp_path):
     import yaml
+
     r = {"blocks": [{"junk": {"style": "rsc", "lines": 140}}]}
-    a = tmp_path / "a.yaml"; b = tmp_path / "b.yaml"
+    a = tmp_path / "a.yaml"
+    b = tmp_path / "b.yaml"
     a.write_text(yaml.safe_dump(r), encoding="utf-8")
     b.write_text(yaml.safe_dump(r), encoding="utf-8")
     result = runner.invoke(app, ["diff", str(a), str(b)])
@@ -85,8 +90,33 @@ def test_diff_identical_recipes(tmp_path):
 
 def test_diff_detects_changed_block(tmp_path):
     import yaml
-    a = tmp_path / "a.yaml"; b = tmp_path / "b.yaml"
-    a.write_text(yaml.safe_dump({"blocks": [{"junk": {"style": "rsc", "lines": 60}}]}), encoding="utf-8")
-    b.write_text(yaml.safe_dump({"blocks": [{"junk": {"style": "rsc", "lines": 140}}]}), encoding="utf-8")
+
+    a = tmp_path / "a.yaml"
+    b = tmp_path / "b.yaml"
+    a.write_text(
+        yaml.safe_dump({"blocks": [{"junk": {"style": "rsc", "lines": 60}}]}),
+        encoding="utf-8",
+    )
+    b.write_text(
+        yaml.safe_dump({"blocks": [{"junk": {"style": "rsc", "lines": 140}}]}),
+        encoding="utf-8",
+    )
     result = runner.invoke(app, ["diff", str(a), str(b)])
-    assert "1 block(s) differ" in result.output
+    assert "1 block-level change(s)" in result.output
+
+
+def test_diff_aligns_on_insert():
+    import yaml
+    import tempfile
+
+    base = {"blocks": [{"escape": {"style": "bracket"}}, {"reopen": {}}]}
+    with tempfile.TemporaryDirectory() as d:
+        a = Path(d) / "a.yaml"
+        b = Path(d) / "b.yaml"
+        a.write_text(yaml.safe_dump(base), encoding="utf-8")
+        ins = {"blocks": [{"junk": {"style": "rsc", "lines": 10}}, *base["blocks"]]}
+        b.write_text(yaml.safe_dump(ins), encoding="utf-8")
+        result = runner.invoke(app, ["diff", str(a), str(b)])
+    assert (
+        "1 block-level change(s)" in result.output
+    )  # only the added junk, no positional cascade
