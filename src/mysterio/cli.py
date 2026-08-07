@@ -43,6 +43,20 @@ def _parse_sets(sets: list[str]) -> dict[str, str]:
     return out
 
 
+def _format_payload(text: str, fmt: str) -> str:
+    """Render for embedding. 'python' is a repr() literal safe to splice into
+    .py sources; 'json' is a JSON string literal."""
+    import json as _json
+
+    if fmt == "raw":
+        return text
+    if fmt == "python":
+        return repr(text)
+    if fmt == "json":
+        return _json.dumps(text)
+    raise typer.BadParameter(f"--format expects raw|python|json, got {fmt!r}")
+
+
 @app.command()
 def junk(
     style: str = typer.Argument(..., help="Junk style (see `mysterio styles`)"),
@@ -127,13 +141,16 @@ def encoders() -> None:
 def build(
     recipe_path: Path = typer.Argument(..., help="Path to a recipe YAML"),
     sets: list[str] = typer.Option([], "--set", help="Slot substitution key=value"),
+    fmt: str = typer.Option(
+        "raw", "--format", "-f", help="Output format: raw | python | json"
+    ),
     out: Optional[Path] = typer.Option(
         None, "--out", "-o", help="Write to file instead of stdout"
     ),
 ) -> None:
     """Assemble a chassis from a recipe file."""
     recipe = R.load_recipe_file(recipe_path)
-    _emit(R.assemble(recipe, _parse_sets(sets)), out)
+    _emit(_format_payload(R.assemble(recipe, _parse_sets(sets)), fmt), out)
 
 
 @app.command("use")
@@ -142,6 +159,9 @@ def use(
         ..., help="Library payload name (see `mysterio library`)"
     ),
     sets: list[str] = typer.Option([], "--set", help="Slot substitution key=value"),
+    fmt: str = typer.Option(
+        "raw", "--format", "-f", help="Output format: raw | python | json"
+    ),
     out: Optional[Path] = typer.Option(
         None, "--out", "-o", help="Write to file instead of stdout"
     ),
@@ -151,7 +171,7 @@ def use(
     if name not in library:
         err_console.print(f"no library payload {name!r}; see `mysterio library`")
         raise typer.Exit(2)
-    _emit(R.assemble(library[name], _parse_sets(sets)), out)
+    _emit(_format_payload(R.assemble(library[name], _parse_sets(sets)), fmt), out)
 
 
 @app.command()
