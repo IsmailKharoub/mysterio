@@ -27,3 +27,12 @@ def test_all_styles_generate():
     for name in J.STYLES:
         out = J.generate(name)
         assert isinstance(out, str) and len(out) > 100, name
+
+
+def test_new_styles_shape():
+    assert J.generate("openapi", lines=20).count("/v3/") >= 2
+    assert "diff --git" in J.generate("git-diff", lines=20)
+    assert J.generate("csv", lines=10).splitlines()[0].startswith("id,")
+    assert J.generate("csv", lines=10).count("\n") == 10
+    assert "INSERT INTO" in J.generate("sql", lines=5)
+    assert "function" in J.generate("min-js", lines=3)

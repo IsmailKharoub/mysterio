@@ -178,6 +178,109 @@ def gen_jsonl(lines: int = 60, seed: str = "jsonl") -> str:
     return "\n".join(out)
 
 
+def gen_openapi(lines: int = 80, seed: str = "openapi") -> str:
+    """OpenAPI YAML fragments (API-spec surface noise)."""
+    rng = random.Random(seed)
+    nouns = [
+        "contacts",
+        "deals",
+        "threads",
+        "exports",
+        "segments",
+        "webhooks",
+        "owners",
+    ]
+    out: list[str] = []
+    while len(out) < lines:
+        noun = rng.choice(nouns)
+        rid = _hex_token(seed, len(out), 8)
+        out.extend(
+            [
+                f"  /v3/{noun}/{rid}:",
+                "    get:",
+                f'      summary: "List {noun} scoped to portal"',
+                f"      operationId: list_{noun}_{rid}",
+                "      parameters:",
+                f"        - {{name: limit, in: query, schema: {{type: integer, default: {rng.choice([50, 100])}}}}}",
+                "        - {name: after, in: query, schema: {type: string}}",
+                "      responses:",
+                f'        "200": {{description: paged {noun}}}',
+                '        "429": {description: rate limited, retry-after seconds}',
+            ]
+        )
+    return "\n".join(out[:lines])
+
+
+def gen_git_diff(lines: int = 80, seed: str = "diff") -> str:
+    """Unified-diff hunks (code-review surface noise)."""
+    rng = random.Random(seed)
+    files = [
+        "src/handlers/sync.py",
+        "src/lib/stream.ts",
+        "internal/queue/worker.go",
+        "pkg/exporter/chunk.py",
+        "web/components/Thread.tsx",
+    ]
+    out: list[str] = []
+    i = 0
+    while len(out) < lines:
+        f = rng.choice(files)
+        out.append(f"diff --git a/{f} b/{f}")
+        out.append(
+            f"index {_hex_token(seed, i, 7)}..{_hex_token(seed, i + 1, 7)} 100644"
+        )
+        out.append(f"--- a/{f}")
+        out.append(f"+++ b/{f}")
+        out.append(
+            f"@@ -{rng.randint(10, 800)},{rng.randint(4, 12)} +{rng.randint(10, 800)},{rng.randint(4, 12)} @@"
+        )
+        for j in range(rng.randint(4, 8)):
+            sign = rng.choice([" ", " ", "-", "+"])
+            out.append(
+                f"{sign}    {_token(seed, i * 10 + j, 12)} = process(chunk, flags)"
+            )
+        i += 1
+    return "\n".join(out[:lines])
+
+
+def gen_csv(lines: int = 60, seed: str = "csv") -> str:
+    """Tabular export rows (data-surface noise)."""
+    rng = random.Random(seed)
+    out = ["id,contact_email,deal_value,stage,updated_at"]
+    stages = ["discovery", "demo", "negotiation", "closed-won", "closed-lost"]
+    for i in range(lines):
+        out.append(
+            f"{10000 + i},user{_hex_token(seed, i, 6)}@example.com,"
+            f"{rng.randint(4, 900) * 1000},{rng.choice(stages)},2026-05-{rng.randint(1, 28):02d}"
+        )
+    return "\n".join(out)
+
+
+def gen_min_js(lines: int = 30, seed: str = "minjs") -> str:
+    """Minified-JS bundle lines (web-bundle surface noise)."""
+    out = []
+    for i in range(lines):
+        body = _token(seed, i, 48)
+        out.append(
+            f'!function(e,t){{"object"==typeof exports&&"undefined"!=typeof module?'
+            f't(exports):e["{_hex_token(seed, i, 6)}"]={body[:20]}}}();/* chunk {i} */'
+        )
+    return "\n".join(out)
+
+
+def gen_sql(lines: int = 60, seed: str = "sql") -> str:
+    """INSERT statement rows (DB-seed surface noise)."""
+    rng = random.Random(seed)
+    out = []
+    for i in range(lines):
+        out.append(
+            f"INSERT INTO events (id, actor, verb, object_id, created_at) VALUES "
+            f"('{_hex_token(seed, i, 12)}', 'system', 'synced', {rng.randint(1000, 99999)}, "
+            f"'2026-05-04 10:{i % 60:02d}:00Z');"
+        )
+    return "\n".join(out)
+
+
 STYLES: dict[str, JunkStyle] = {
     "rsc": JunkStyle(
         "rsc", gen_rsc, "React Server Components stream chunks (N:{...} rows)"
@@ -189,6 +292,11 @@ STYLES: dict[str, JunkStyle] = {
     "syslog": JunkStyle("syslog", gen_syslog, "Linux syslog lines"),
     "base64": JunkStyle("base64", gen_base64_blob, "MIME-wrapped base64 blob"),
     "jsonl": JunkStyle("jsonl", gen_jsonl, "Telemetry JSONL rows"),
+    "openapi": JunkStyle("openapi", gen_openapi, "OpenAPI YAML spec fragments"),
+    "git-diff": JunkStyle("git-diff", gen_git_diff, "Unified diff hunks"),
+    "csv": JunkStyle("csv", gen_csv, "Tabular export rows (with header)"),
+    "min-js": JunkStyle("min-js", gen_min_js, "Minified JS bundle lines"),
+    "sql": JunkStyle("sql", gen_sql, "SQL INSERT seed rows"),
 }
 
 
