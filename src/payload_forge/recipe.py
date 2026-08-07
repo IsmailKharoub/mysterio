@@ -1,0 +1,135 @@
+"""YAML recipe loading and chassis assembly.
+
+A recipe is an ordered list of blocks. Example:
+
+    name: demo
+    blocks:
+      - pretext: {text: "pasting the debug bundle"}
+      - junk: {style: rsc, lines: 140}
+      - escape: {style: bracket}
+      - reminder: {template: interruption}
+      - banner: {style: unicode, ts: "2026-05-04 11:20AM"}
+      - ask: {wrapper: user_query, text: "check the thread ..."}
+      - tail: {text: "bundle ends here."}
+
+Block text fields support {slot} substitution via --set key=value.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from . import blocks as B
+from . import junk as J
+from . import encoders as E
+
+
+def library_dir() -> Path:
+    """Resolution order: $PF_LIBRARY, ./library, ~/.config/payload-forge/library,
+    package-relative (dev repo)."""
+    env = os.environ.get("PF_LIBRARY")
+    if env:
+        return Path(env)
+    cwd = Path.cwd() / "library"
+    if cwd.is_dir():
+        return cwd
+    xdg = Path.home() / ".config" / "payload-forge" / "library"
+    if xdg.is_dir():
+        return xdg
+    return Path(__file__).resolve().parents[2] / "library"
+
+
+class RecipeError(ValueError):
+    pass
+
+
+def _subst(value: Any, slots: dict[str, str]) -> Any:
+    if isinstance(value, str):
+        try:
+            return value.format(**slots)
+        except KeyError as e:
+            raise RecipeError(f"missing slot {e} (pass --set {e.args[0]}=...)") from e
+    if isinstance(value, dict):
+        return {k: _subst(v, slots) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_subst(v, slots) for v in value]
+    return value
+
+
+def assemble(recipe: dict[str, Any], slots: dict[str, str] | None = None) -> str:
+    slots = slots or {}
+    blocks = recipe.get("blocks")
+    if not isinstance(blocks, list):
+        raise RecipeError("recipe needs a 'blocks' list")
+
+    parts: list[str] = []
+    reopen = ""
+    for raw in blocks:
+        if not isinstance(raw, dict) or len(raw) != 1:
+            raise RecipeError(f"each block must be a single-key map, got: {raw!r}")
+        kind, spec = next(iter(raw.items()))
+        spec = _subst(spec or {}, slots)
+
+        if kind == "pretext":
+            parts.append(str(spec["text"]))
+        elif kind == "junk":
+            style = spec["style"]
+            kwargs = {k: v for k, v in spec.items() if k != "style"}
+            parts.append(J.generate(style, **kwargs))
+        elif kind == "escape":
+            close, reopen = B.ESCAPES[spec["style"]]
+            parts.append(close)
+        elif kind == "reminder":
+            template = spec["template"]
+            slots_for = {k: v for k, v in spec.items() if k != "template"}
+            parts.append(B.reminder(template, **slots_for))
+        elif kind == "banner":
+            parts.append(
+                B.banner(
+                    spec.get("style", "unicode"),
+                    ts=spec.get("ts", ""),
+                    n=int(spec.get("n", 1)),
+                )
+            )
+        elif kind == "ask":
+            text = str(spec["text"])
+            if "encode" in spec:
+                text = E.encode(spec["encode"], text)
+            parts.append(B.ask(text, spec.get("wrapper", "user_query")))
+        elif kind == "reopen":
+            parts.append(spec.get("text") or reopen)
+        elif kind == "tail":
+            parts.append(str(spec["text"]))
+        else:
+            raise RecipeError(f"unknown block kind: {kind!r}")
+
+    sep = recipe.get("separator", "\n\n")
+    return sep.join(p for p in parts if p)
+
+
+def load_recipe_file(path: Path) -> dict[str, Any]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise RecipeError(f"{path}: recipe must be a mapping")
+    return data
+
+
+def load_library() -> dict[str, dict[str, Any]]:
+    """Merge library YAML files. Later files override earlier ones;
+    library.local.yaml (gitignored, private) loads last and wins."""
+    out: dict[str, dict[str, Any]] = {}
+    lib_dir = library_dir()
+    if not lib_dir.is_dir():
+        return out
+    for path in sorted(lib_dir.glob("*.yaml")):
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        entries = data.get("payloads", {})
+        for name, entry in entries.items():
+            entry = dict(entry)
+            entry["_source"] = path.name
+            out[name] = entry
+    return out

@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+dist/
+*.egg-info/
+.pytest_cache/
+
+# Private payload library — never commit real engagements' payloads.
+library/library.local.yaml
+library/*.local.yaml
+
+.env
+.env.*
