@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import difflib
+import json
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
 import typer
+import yaml
 from rich.console import Console
 from rich.table import Table
 
@@ -46,17 +49,32 @@ def _parse_sets(sets: list[str]) -> dict[str, str]:
     return out
 
 
+@contextmanager
+def _clean_errors():
+    """Recipe-layer failures become one-line stderr messages (exit 2)
+    instead of tracebacks."""
+    try:
+        yield
+    except FileNotFoundError as e:
+        err_console.print(f"error: no such file: {e.filename}")
+        raise typer.Exit(2) from e
+    except yaml.YAMLError as e:
+        err_console.print(f"error: invalid YAML — {e}")
+        raise typer.Exit(2) from e
+    except R.RecipeError as e:
+        err_console.print(f"error: {e}")
+        raise typer.Exit(2) from e
+
+
 def _format_payload(text: str, fmt: str) -> str:
     """Render for embedding. 'python' is a repr() literal safe to splice into
     .py sources; 'json' is a JSON string literal."""
-    import json as _json
-
     if fmt == "raw":
         return text
     if fmt == "python":
         return repr(text)
     if fmt == "json":
-        return _json.dumps(text)
+        return json.dumps(text)
     raise typer.BadParameter(f"--format expects raw|python|json, got {fmt!r}")
 
 
@@ -165,8 +183,9 @@ def build(
     ),
 ) -> None:
     """Assemble a chassis from a recipe file."""
-    recipe = R.load_recipe_file(recipe_path)
-    _emit(_format_payload(R.assemble(recipe, _parse_sets(sets)), fmt), out)
+    with _clean_errors():
+        recipe = R.load_recipe_file(recipe_path)
+        _emit(_format_payload(R.assemble(recipe, _parse_sets(sets)), fmt), out)
 
 
 @app.command("use")
@@ -183,11 +202,12 @@ def use(
     ),
 ) -> None:
     """Render a payload from the library."""
-    library = R.load_library()
-    if name not in library:
-        err_console.print(f"no library payload {name!r}; see `mysterio library`")
-        raise typer.Exit(2)
-    _emit(_format_payload(R.assemble(library[name], _parse_sets(sets)), fmt), out)
+    with _clean_errors():
+        library = R.load_library()
+        if name not in library:
+            err_console.print(f"no library payload {name!r}; see `mysterio library`")
+            raise typer.Exit(2)
+        _emit(_format_payload(R.assemble(library[name], _parse_sets(sets)), fmt), out)
 
 
 @app.command()
@@ -195,13 +215,12 @@ def show(
     name: str = typer.Argument(..., help="Library payload name"),
 ) -> None:
     """Inspect a library entry: description, references, full recipe."""
-    import yaml as _yaml
-
-    library = R.load_library()
-    if name not in library:
-        err_console.print(f"no library payload {name!r}; see `mysterio library`")
-        raise typer.Exit(2)
-    entry = library[name]
+    with _clean_errors():
+        library = R.load_library()
+        if name not in library:
+            err_console.print(f"no library payload {name!r}; see `mysterio library`")
+            raise typer.Exit(2)
+        entry = library[name]
     console.print(
         f"[cyan bold]{name}[/cyan bold]  [dim]({entry.get('_source', '?')})[/dim]"
     )
@@ -213,7 +232,7 @@ def show(
             console.print(f"  - {ref}")
     console.print("\n[bold]recipe[/bold]")
     printable = {k: v for k, v in entry.items() if not k.startswith("_")}
-    console.print(_yaml.safe_dump(printable, sort_keys=False).strip())
+    console.print(yaml.safe_dump(printable, sort_keys=False, allow_unicode=True).strip())
 
 
 @app.command()
@@ -243,17 +262,18 @@ def check(
     target: str = typer.Argument(..., help="Recipe YAML path, or library payload name"),
 ) -> None:
     """Lint a recipe against the empirical authoring rules."""
-    path = Path(target)
-    if path.is_file():
-        recipe = R.load_recipe_file(path)
-        source = str(path)
-    else:
-        library = R.load_library()
-        if target not in library:
-            err_console.print(f"{target!r} is neither a file nor a library payload")
-            raise typer.Exit(2)
-        recipe = library[target]
-        source = f"library:{target}"
+    with _clean_errors():
+        path = Path(target)
+        if path.is_file():
+            recipe = R.load_recipe_file(path)
+            source = str(path)
+        else:
+            library = R.load_library()
+            if target not in library:
+                err_console.print(f"{target!r} is neither a file nor a library payload")
+                raise typer.Exit(2)
+            recipe = library[target]
+            source = f"library:{target}"
 
     findings = L.lint_recipe(recipe)
     table = Table(title=f"check: {source}")
@@ -290,43 +310,45 @@ def vary(
     ),
 ) -> None:
     """Sweep one or more recipe fields and emit one arm per combination."""
-    import yaml as _yaml
-
-    path = Path(target)
-    if path.is_file():
-        recipe = R.load_recipe_file(path)
-    else:
-        library = R.load_library()
-        if target not in library:
-            err_console.print(f"{target!r} is neither a file nor a library payload")
-            raise typer.Exit(2)
-        recipe = library[target]
-
-    try:
-        arms = V.vary_recipe(recipe, varies, zip_mode)
-    except ValueError as e:
-        err_console.print(str(e))
-        raise typer.Exit(2) from e
-
-    slots = _parse_sets(sets)
-    if out_dir is None:
-        table = Table(
-            title=f"vary: {len(arms)} arm(s) (dry run — pass --out-dir to write)"
-        )
-        table.add_column("arm", style="cyan")
-        for label, _ in arms:
-            table.add_row(label)
-        console.print(table)
-        return
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    for label, arm in arms:
-        dest = out_dir / (f"{label}.yaml" if recipes else f"{label}.txt")
-        if recipes:
-            dest.write_text(_yaml.safe_dump(arm, sort_keys=False), encoding="utf-8")
+    with _clean_errors():
+        path = Path(target)
+        if path.is_file():
+            recipe = R.load_recipe_file(path)
         else:
-            dest.write_text(R.assemble(arm, slots) + "\n", encoding="utf-8")
-        err_console.print(f"wrote {dest}")
+            library = R.load_library()
+            if target not in library:
+                err_console.print(f"{target!r} is neither a file nor a library payload")
+                raise typer.Exit(2)
+            recipe = library[target]
+
+        try:
+            arms = V.vary_recipe(recipe, varies, zip_mode)
+        except ValueError as e:
+            err_console.print(str(e))
+            raise typer.Exit(2) from e
+
+        slots = _parse_sets(sets)
+        if out_dir is None:
+            table = Table(
+                title=f"vary: {len(arms)} arm(s) (dry run — pass --out-dir to write)"
+            )
+            table.add_column("arm", style="cyan")
+            for label, _ in arms:
+                table.add_row(label)
+            console.print(table)
+            return
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for label, arm in arms:
+            dest = out_dir / (f"{label}.yaml" if recipes else f"{label}.txt")
+            if recipes:
+                dest.write_text(
+                    yaml.safe_dump(arm, sort_keys=False, allow_unicode=True),
+                    encoding="utf-8",
+                )
+            else:
+                dest.write_text(R.assemble(arm, slots) + "\n", encoding="utf-8")
+            err_console.print(f"wrote {dest}")
 
 
 def _resolve_recipe(target: str) -> tuple[dict, str]:
@@ -345,10 +367,9 @@ def diff(
     right: str = typer.Argument(..., help="Right recipe (file or library name)"),
 ) -> None:
     """Block-level diff between two recipes."""
-    import yaml as _yaml
-
-    la, lsrc = _resolve_recipe(left)
-    ra, rsrc = _resolve_recipe(right)
+    with _clean_errors():
+        la, lsrc = _resolve_recipe(left)
+        ra, rsrc = _resolve_recipe(right)
     lb = la.get("blocks", [])
     rb = ra.get("blocks", [])
 
@@ -368,8 +389,8 @@ def diff(
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         if tag == "equal":
             for i, j in zip(range(i1, i2), range(j1, j2)):
-                l_txt = _yaml.safe_dump(lb[i], sort_keys=False).strip()
-                r_txt = _yaml.safe_dump(rb[j], sort_keys=False).strip()
+                l_txt = yaml.safe_dump(lb[i], sort_keys=False).strip()
+                r_txt = yaml.safe_dump(rb[j], sort_keys=False).strip()
                 if l_txt != r_txt:
                     changed += 1
                     table.add_row(lk[i], "modified", l_txt, r_txt)
@@ -379,13 +400,13 @@ def diff(
                 table.add_row(
                     lk[i],
                     "removed",
-                    _yaml.safe_dump(lb[i], sort_keys=False).strip(),
+                    yaml.safe_dump(lb[i], sort_keys=False).strip(),
                     "—",
                 )
             for j in range(j1, j2):
                 changed += 1
                 table.add_row(
-                    rk[j], "added", "—", _yaml.safe_dump(rb[j], sort_keys=False).strip()
+                    rk[j], "added", "—", yaml.safe_dump(rb[j], sort_keys=False).strip()
                 )
     if changed:
         console.print(table)
@@ -447,11 +468,12 @@ def stats(
     ),
 ) -> None:
     """Measure payload size: chars, lines, rough token estimate."""
-    text = (
-        sys.stdin.read()
-        if (path is None or str(path) == "-")
-        else path.read_text(encoding="utf-8")
-    )
+    with _clean_errors():
+        text = (
+            sys.stdin.read()
+            if (path is None or str(path) == "-")
+            else path.read_text(encoding="utf-8")
+        )
     table = Table(title="payload stats")
     table.add_column("metric", style="cyan")
     table.add_column("value", justify="right")
@@ -503,11 +525,12 @@ def review(
     ),
 ) -> None:
     """Flag guardrail-triggering words in a payload (needs MYSTERIO_LLM_API_KEY)."""
-    text = (
-        sys.stdin.read()
-        if (path is None or str(path) == "-")
-        else path.read_text(encoding="utf-8")
-    )
+    with _clean_errors():
+        text = (
+            sys.stdin.read()
+            if (path is None or str(path) == "-")
+            else path.read_text(encoding="utf-8")
+        )
     try:
         print(G.review(text, model=model))
     except G.LLMError as e:

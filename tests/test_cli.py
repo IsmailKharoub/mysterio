@@ -42,6 +42,47 @@ def test_unknown_style_exit_2():
     assert runner.invoke(app, ["encode", "x", "-m", "nope"]).exit_code == 2
 
 
+def test_recipe_errors_are_clean(tmp_path: Path):
+    """Recipe-layer failures print one line to stderr, exit 2, no traceback."""
+    bad_yaml = tmp_path / "bad.yaml"
+    bad_yaml.write_text("blocks: [unclosed", encoding="utf-8")
+    result = runner.invoke(app, ["build", str(bad_yaml)])
+    assert result.exit_code == 2
+    assert "invalid YAML" in result.output
+    assert "Traceback" not in result.output
+
+    missing_slot = tmp_path / "slot.yaml"
+    missing_slot.write_text(
+        "blocks:\n  - ask: {wrapper: plain, text: '{ask}'}\n", encoding="utf-8"
+    )
+    result = runner.invoke(app, ["build", str(missing_slot)])
+    assert result.exit_code == 2
+    assert "missing slot" in result.output
+    assert "Traceback" not in result.output
+
+    bad_field = tmp_path / "field.yaml"
+    bad_field.write_text("blocks:\n  - escape: {text: nope}\n", encoding="utf-8")
+    result = runner.invoke(app, ["build", str(bad_field)])
+    assert result.exit_code == 2
+    assert "needs a 'style' field" in result.output
+    assert "Traceback" not in result.output
+
+    unknown_block = tmp_path / "block.yaml"
+    unknown_block.write_text("blocks:\n  - frobnicate: {}\n", encoding="utf-8")
+    result = runner.invoke(app, ["build", str(unknown_block)])
+    assert result.exit_code == 2
+    assert "unknown block kind" in result.output
+
+    result = runner.invoke(app, ["build", str(tmp_path / "nope.yaml")])
+    assert result.exit_code == 2
+    assert "no such file" in result.output
+    assert "Traceback" not in result.output
+
+    result = runner.invoke(app, ["stats", str(tmp_path / "nope.txt")])
+    assert result.exit_code == 2
+    assert "no such file" in result.output
+
+
 def test_format_python_roundtrip(tmp_path):
     from mysterio.cli import _format_payload
     import ast
