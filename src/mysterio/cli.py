@@ -15,6 +15,7 @@ from . import encoders as E
 from . import gen as G
 from . import junk as J
 from . import lint as L
+from . import logo as LG
 from . import recipe as R
 from . import vary as V
 
@@ -427,6 +428,16 @@ def lab() -> None:
     from .lab import run
 
     run()
+
+
+@app.command()
+def logo() -> None:
+    """Print the banner. There's more to it than meets the eye."""
+    print(LG.banner())
+    err_console.print(
+        "[dim]psst — the banner hides a message: "
+        "mysterio logo | mysterio encode -d -m tag -[/dim]"
+    )
 
 
 @app.command()

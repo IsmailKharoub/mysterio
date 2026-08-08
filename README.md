@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" width="260" alt="mysterio — a glass dome of smoke with glyphs dissolving into noise">
+</p>
+
 # mysterio
 
 **The payload workbench for AI security research.** mysterio authors the
