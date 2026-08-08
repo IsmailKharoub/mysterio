@@ -62,9 +62,9 @@ class _CopyTable(DataTable):
     DataTable only selects when clicking the *already* highlighted row, so
     first-click copy silently does nothing."""
 
-    def _on_click(self, event) -> None:
+    async def _on_click(self, event) -> None:
         before = self.cursor_coordinate
-        super()._on_click(event)
+        await super()._on_click(event)
         if self.cursor_coordinate != before and self.show_cursor:
             self._post_selected_message()
 

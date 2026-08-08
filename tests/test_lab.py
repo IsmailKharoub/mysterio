@@ -63,7 +63,7 @@ async def test_encoder_first_click_copies():
         app.query_one(TabbedContent).active = "tab-encoders"
         app.query_one("#encode-input").value = "hello"
         await pilot.pause()
-        await pilot.click("#encode-table")
+        await pilot.click("#encode-table", offset=(10, 5))
         await pilot.pause()
         assert any("copied" in n for n in notes)
 
