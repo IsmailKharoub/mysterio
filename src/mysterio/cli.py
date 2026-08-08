@@ -141,6 +141,11 @@ def humanizers() -> None:
     for name, h in regs.items():
         table.add_row(name, h.description, h.source)
     console.print(table)
+    console.print(
+        "free-form: `gen humanize --style` also accepts any voice description "
+        "(LLM), e.g. --style 'a tired nurse on night shift'",
+        style="dim",
+    )
 
 
 @app.command()
@@ -580,7 +585,9 @@ def gen(
         None, "--length", help="e.g. 'one line', '2 sentences'"
     ),
     style: Optional[str] = typer.Option(
-        None, "--style", help="humanize only: humanizer name (`mysterio humanizers`)"
+        None, "--style",
+        help="humanize only: humanizer name (`mysterio humanizers`) or any "
+             "free-form voice, e.g. 'a tired nurse on night shift'",
     ),
     fresh: bool = typer.Option(False, "--fresh", help="Bypass the on-disk cache"),
     model: Optional[str] = typer.Option(
@@ -594,26 +601,36 @@ def gen(
 
     Generate-then-bake: pipe the output into --set or paste it into a recipe;
     assemble never calls the network. `gen humanize --style voice-note`
-    LLM-rewrites the brief text in a humanizer's style.
+    LLM-rewrites the brief text in a humanizer's style; an unknown --style is
+    treated as a free-form voice (authorship) description.
     """
     try:
         if kind == "humanize":
             if not style:
                 err_console.print(
-                    "gen humanize needs --style (see `mysterio humanizers`)"
+                    "gen humanize needs --style — a humanizer name "
+                    "(`mysterio humanizers`) or any free-form voice"
                 )
                 raise typer.Exit(2)
             with _clean_errors():
                 regs = H.load_humanizers(R.library_dirs())
-            if style not in regs:
-                err_console.print(
-                    f"unknown humanizer {style!r}; see `mysterio humanizers`"
+            if style in regs:
+                h = regs[style]
+                instructions = h.prompt or h.description or style
+            else:
+                if " " not in style.strip():
+                    err_console.print(
+                        f"note: no humanizer named {style!r} — "
+                        "treating --style as a free-form voice",
+                        style="dim",
+                    )
+                # a persona label is not a style instruction — unwrap it so
+                # the model gets speech patterns, not just a noun phrase
+                instructions = (
+                    f"the authentic voice of {style} — their speech patterns, "
+                    "vocabulary, rhythm, and energy"
                 )
-                raise typer.Exit(2)
-            h = regs[style]
-            text = G.rewrite(
-                brief, h.prompt or h.description or style, fresh=fresh, model=model
-            )
+            text = G.rewrite(brief, instructions, fresh=fresh, model=model)
         else:
             text = G.generate(
                 kind, brief, tone=tone, length=length, fresh=fresh, model=model

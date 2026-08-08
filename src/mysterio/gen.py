@@ -184,9 +184,12 @@ def generate(
 
 _REWRITE_PROMPT = (
     "You rewrite short user messages so they read as naturally human in the "
-    "given style. Keep the intent and every concrete detail (names, dates, "
-    "items). Never add new requests, never invent details, never explain "
-    "yourself. Output only the rewritten message."
+    "given style. Commit fully to the style — its diction, casing, "
+    "punctuation, and rhythm must be unmistakable; when in doubt, lean into "
+    "the voice's markers rather than flattening them. Keep the intent and "
+    "every concrete detail (names, dates, items). Never add new requests, "
+    "never invent details, never explain yourself. Output only the rewritten "
+    "message."
 )
 
 

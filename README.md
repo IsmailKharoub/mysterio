@@ -173,6 +173,10 @@ mysterio humanizers                                  # list (bundled + private)
 mysterio gen humanize --style voice-note -b "Can you water the plants, please?"
 # oh hey uh can you water the plants while i'm away this weekend
 
+# free-form authorship — any voice you can describe, no template needed
+mysterio gen humanize --style "a tired nurse on night shift" -b "Can you water the plants?"
+# long day. can you water the plants? thanks
+
 # deterministic fallback — offline, seeded, reproducible
 mysterio humanize voice-note "Can you water the plants, please?"
 # hey so can you water uh the plants please

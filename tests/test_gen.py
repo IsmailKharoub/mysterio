@@ -181,7 +181,30 @@ def test_cli_gen_humanize(isolated, monkeypatch):
 def test_cli_gen_humanize_needs_style(isolated, monkeypatch):
     monkeypatch.setenv("MYSTERIO_LLM_API_KEY", "sk-test")
     assert runner.invoke(app, ["gen", "humanize", "-b", "x"]).exit_code == 2
-    assert (
-        runner.invoke(app, ["gen", "humanize", "--style", "nope", "-b", "x"]).exit_code
-        == 2
+
+
+def test_cli_gen_humanize_freeform_voice(isolated, monkeypatch):
+    """An unknown --style is a free-form authorship voice: its text goes
+    straight to the model as the style instruction."""
+    monkeypatch.setenv("MYSTERIO_LLM_API_KEY", "sk-test")
+    calls, fake = fake_chat("omg the plants. the plants again. fine")
+    monkeypatch.setattr(G, "chat_complete", fake)
+    result = runner.invoke(
+        app,
+        ["gen", "humanize", "--style", "a tired nurse on night shift",
+         "-b", "Can you water the plants?"],
     )
+    assert result.exit_code == 0
+    assert "omg the plants" in result.output
+    assert "a tired nurse on night shift" in calls[0][-1]["content"]
+
+
+def test_cli_gen_humanize_freeform_single_token_notes(isolated, monkeypatch):
+    """Single-token unknown styles still work, but warn — likely a typo."""
+    monkeypatch.setenv("MYSTERIO_LLM_API_KEY", "sk-test")
+    calls, fake = fake_chat("ok")
+    monkeypatch.setattr(G, "chat_complete", fake)
+    result = runner.invoke(app, ["gen", "humanize", "--style", "nope", "-b", "x"])
+    assert result.exit_code == 0
+    assert "no humanizer named 'nope'" in result.output
+    assert "nope" in calls[0][-1]["content"]
