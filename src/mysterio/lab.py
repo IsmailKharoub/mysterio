@@ -157,12 +157,8 @@ class MysterioLab(App[None]):
             stats.update("")
             return
 
-        for i, f in enumerate(L.lint_recipe(recipe)):
-            lint_view.append(
-                ListItem(
-                    Label(f"[{f.level}] {f.code}: {f.message}"), id=f"lint-{i}-{f.code}"
-                )
-            )
+        for f in L.lint_recipe(recipe):
+            lint_view.append(ListItem(Label(f"[{f.level}] {f.code}: {f.message}")))
 
         slots = _parse_slots(self.query_one("#slots", Input).value)
         try:
