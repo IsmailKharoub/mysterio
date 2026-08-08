@@ -67,9 +67,18 @@ class MysterioLab(App[None]):
     #stats, #junk-stats, #lib-stats { height: auto; padding: 0 1; }
     #lint { height: auto; max-height: 8; border: solid $warning; }
     .row { height: auto; padding: 1 0; }
+    .row Input { width: 1fr; }
+    #junk-style { width: 24; }
+    #lib-col-list { width: 28; }
     DataTable { height: 1fr; }
     ListView { height: 1fr; }
+    .hint { color: $text-muted; height: auto; padding: 0 1; }
     """
+
+    BINDINGS = [("q", "quit", "quit")]
+
+    MAX_JUNK_LINES = 5_000
+    MAX_JUNK_TOKENS = 100_000
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -103,10 +112,15 @@ class MysterioLab(App[None]):
                         id="junk-style",
                         allow_blank=False,
                     )
-                    yield Input(value="140", id="junk-lines", placeholder="lines")
-                    yield Input(id="junk-tokens", placeholder="or ~tokens")
+                    yield Input(
+                        value="140", id="junk-lines", placeholder="lines", type="integer"
+                    )
+                    yield Input(
+                        id="junk-tokens", placeholder="or ~tokens", type="integer"
+                    )
                 with Vertical(id="junk-preview"):
-                    yield RichLog(id="junk-render", markup=False)
+                    yield Label("preview", markup=False)
+                    yield RichLog(id="junk-render", markup=False, wrap=True)
                     yield Label("", id="junk-stats", markup=False)
             with TabPane("Library", id="tab-library"):
                 with Horizontal():
@@ -212,25 +226,42 @@ class MysterioLab(App[None]):
 
     def _render_junk(self) -> None:
         style = str(self.query_one("#junk-style", Select).value)
-        lines_raw = self.query_one("#junk-lines", Input).value or "0"
-        tokens_raw = self.query_one("#junk-tokens", Input).value
+        lines_raw = self.query_one("#junk-lines", Input).value.strip()
+        tokens_raw = self.query_one("#junk-tokens", Input).value.strip()
         log = self.query_one("#junk-render", RichLog)
         stats = self.query_one("#junk-stats", Label)
         log.clear()
+        notes: list[str] = []
         try:
-            lines = int(lines_raw) if lines_raw.isdigit() else 0
-            if tokens_raw.strip().isdigit():
-                lines = J.lines_for_tokens(style, int(tokens_raw))
+            if lines_raw.lstrip("-").isdigit():
+                lines = int(lines_raw)
+                if lines < 1 or lines > self.MAX_JUNK_LINES:
+                    lines = max(1, min(lines, self.MAX_JUNK_LINES))
+                    notes.append(f"lines clamped to {lines:,}")
+            else:
+                lines = 140
+                if lines_raw:
+                    notes.append("invalid lines — using 140")
+            if tokens_raw.isdigit():
+                tokens = max(1, min(int(tokens_raw), self.MAX_JUNK_TOKENS))
+                lines = J.lines_for_tokens(style, tokens)
+                notes.append(f"~{tokens:,} tokens overrides lines")
             text = (
-                J.generate(style, lines=max(1, lines))
+                J.generate(style, lines=lines)
                 if style != "base64"
-                else J.generate(style, size=max(1, lines) * 32)
+                else J.generate(style, size=lines * 32)
             )
         except Exception as e:  # noqa: BLE001 — surface generator errors in-pane
             log.write(Text(str(e), style="red"))
+            stats.update("")
             return
+        if style == "base64":
+            notes.append("lines x 32 bytes")
         log.write(Text(text))
-        stats.update(f"{style} · {len(text):,} chars · ~{len(text) // 4:,} tokens")
+        note = f" — {'; '.join(notes)}" if notes else ""
+        stats.update(
+            f"{style} · {len(text):,} chars · ~{len(text) // 4:,} tokens{note}"
+        )
 
     @on(Select.Changed, "#junk-style")
     @on(Input.Changed, "#junk-lines")

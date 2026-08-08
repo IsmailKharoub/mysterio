@@ -51,3 +51,36 @@ async def test_encoder_table_populates():
         inp.value = "hello"
         await pilot.pause()
         assert table.row_count > 25
+
+
+@pytest.mark.asyncio
+async def test_junk_controls_row_layout():
+    """The style Select must be readable and the tokens input on-screen."""
+    app = MysterioLab()
+    async with app.run_test() as pilot:
+        await pilot.click("#tab-junk")
+        await pilot.pause()
+        screen_w = app.screen.size.width
+        style = app.query_one("#junk-style")
+        tokens = app.query_one("#junk-tokens")
+        assert style.region.width >= 20
+        assert tokens.region.x >= 0
+        assert tokens.region.x + tokens.region.width <= screen_w
+
+
+@pytest.mark.asyncio
+async def test_junk_dose_clamped_and_noted():
+    app = MysterioLab()
+    async with app.run_test() as pilot:
+        await pilot.click("#tab-junk")
+        lines = app.query_one("#junk-lines")
+        lines.value = "100000"
+        await pilot.pause()
+        stats = str(app.query_one("#junk-stats").render())
+        assert "clamped to 5,000" in stats
+
+        tokens = app.query_one("#junk-tokens")
+        tokens.value = "500"
+        await pilot.pause()
+        stats = str(app.query_one("#junk-stats").render())
+        assert "overrides lines" in stats
