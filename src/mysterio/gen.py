@@ -7,8 +7,10 @@ into a recipe, so built payloads stay reproducible.
 
 Config (any OpenAI-compatible chat-completions endpoint):
 
-    MYSTERIO_LLM_API_KEY   required
+    MYSTERIO_LLM_API_KEY   required (or OPENROUTER_API_KEY)
     MYSTERIO_LLM_BASE_URL  default https://api.openai.com/v1
+                           (https://openrouter.ai/api/v1 when falling back
+                           to OPENROUTER_API_KEY)
     MYSTERIO_LLM_MODEL     default gpt-4o-mini
 """
 
@@ -37,15 +39,22 @@ class LLMConfig:
     model: str
 
 
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
 def resolve_config(model: str | None = None) -> LLMConfig:
     key = os.environ.get("MYSTERIO_LLM_API_KEY", "").strip()
+    base_url = os.environ.get("MYSTERIO_LLM_BASE_URL", "").strip()
+    if not key:
+        key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+        base_url = base_url or OPENROUTER_BASE_URL
     if not key:
         raise LLMError(
-            "LLM features need MYSTERIO_LLM_API_KEY "
-            "(optionally MYSTERIO_LLM_BASE_URL / MYSTERIO_LLM_MODEL)"
+            "LLM features need MYSTERIO_LLM_API_KEY (or OPENROUTER_API_KEY); "
+            "optionally MYSTERIO_LLM_BASE_URL / MYSTERIO_LLM_MODEL"
         )
     return LLMConfig(
-        base_url=os.environ.get("MYSTERIO_LLM_BASE_URL", DEFAULT_BASE_URL).rstrip("/"),
+        base_url=(base_url or DEFAULT_BASE_URL).rstrip("/"),
         api_key=key,
         model=model or os.environ.get("MYSTERIO_LLM_MODEL", DEFAULT_MODEL),
     )

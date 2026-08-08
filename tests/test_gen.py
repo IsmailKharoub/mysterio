@@ -16,9 +16,26 @@ def isolated(tmp_path, monkeypatch):
         "MYSTERIO_LLM_API_KEY",
         "MYSTERIO_LLM_BASE_URL",
         "MYSTERIO_LLM_MODEL",
+        "OPENROUTER_API_KEY",
     ):
         monkeypatch.delenv(var, raising=False)
     return tmp_path
+
+
+def test_openrouter_key_fallback(isolated, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    cfg = G.resolve_config()
+    assert cfg.api_key == "sk-or-test"
+    assert cfg.base_url == G.OPENROUTER_BASE_URL
+
+
+def test_mysterio_key_wins_over_openrouter(isolated, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    monkeypatch.setenv("MYSTERIO_LLM_API_KEY", "sk-test")
+    monkeypatch.setenv("MYSTERIO_LLM_BASE_URL", "https://example.test/v1")
+    cfg = G.resolve_config()
+    assert cfg.api_key == "sk-test"
+    assert cfg.base_url == "https://example.test/v1"
 
 
 def fake_chat(text: str):

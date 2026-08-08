@@ -147,6 +147,7 @@ key is set — nothing leaves the machine otherwise.
 
 ```bash
 export MYSTERIO_LLM_API_KEY=...        # any OpenAI-compatible endpoint
+# (or export OPENROUTER_API_KEY=... — base URL is implied)
 export MYSTERIO_LLM_BASE_URL=...       # optional (OpenRouter, Ollama, ...)
 export MYSTERIO_LLM_MODEL=...          # optional
 
