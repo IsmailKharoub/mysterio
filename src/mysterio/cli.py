@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from . import encoders as E
+from . import gen as G
 from . import junk as J
 from . import lint as L
 from . import recipe as R
@@ -448,3 +449,56 @@ def stats(
     table.add_row("words", f"{len(text.split()):,}")
     table.add_row("~tokens (chars/4)", f"{len(text) // 4:,}")
     console.print(table)
+
+
+@app.command()
+def gen(
+    kind: str = typer.Argument(..., help=f"What to generate: {', '.join(G.GEN_KINDS)}"),
+    brief: str = typer.Option(..., "--brief", "-b", help="One-line content brief"),
+    tone: Optional[str] = typer.Option(None, "--tone", help="e.g. casual, corporate"),
+    length: Optional[str] = typer.Option(
+        None, "--length", help="e.g. 'one line', '2 sentences'"
+    ),
+    fresh: bool = typer.Option(False, "--fresh", help="Bypass the on-disk cache"),
+    model: Optional[str] = typer.Option(
+        None, "--model", help="Override MYSTERIO_LLM_MODEL"
+    ),
+    out: Optional[Path] = typer.Option(
+        None, "--out", "-o", help="Write to file instead of stdout"
+    ),
+) -> None:
+    """Generate benign payload text from a brief (needs MYSTERIO_LLM_API_KEY).
+
+    Generate-then-bake: pipe the output into --set or paste it into a recipe;
+    assemble never calls the network.
+    """
+    try:
+        text = G.generate(
+            kind, brief, tone=tone, length=length, fresh=fresh, model=model
+        )
+    except G.LLMError as e:
+        err_console.print(str(e))
+        raise typer.Exit(2) from e
+    _emit(text, out)
+
+
+@app.command()
+def review(
+    path: Optional[Path] = typer.Argument(
+        None, help="File to review (omit/'-' for stdin)"
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model", help="Override MYSTERIO_LLM_MODEL"
+    ),
+) -> None:
+    """Flag guardrail-triggering words in a payload (needs MYSTERIO_LLM_API_KEY)."""
+    text = (
+        sys.stdin.read()
+        if (path is None or str(path) == "-")
+        else path.read_text(encoding="utf-8")
+    )
+    try:
+        print(G.review(text, model=model))
+    except G.LLMError as e:
+        err_console.print(str(e))
+        raise typer.Exit(2) from e

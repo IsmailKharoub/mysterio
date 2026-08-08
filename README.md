@@ -135,6 +135,27 @@ captures, and code reviews.
 junk-above placement, dose floors, banner load-bearingness, ordering,
 unknown styles). Exit 1 on errors — usable as a pre-submit gate.
 
+## LLM-assisted authoring (optional)
+
+`gen` drafts the benign parts of a payload from a one-line brief; `review`
+flags words and phrasings likely to trip guardrails. Both are off unless a
+key is set — nothing leaves the machine otherwise.
+
+```bash
+export MYSTERIO_LLM_API_KEY=...        # any OpenAI-compatible endpoint
+export MYSTERIO_LLM_BASE_URL=...       # optional (OpenRouter, Ollama, ...)
+export MYSTERIO_LLM_MODEL=...          # optional
+
+mysterio gen pretext --brief "vendor debug bundle for a sync issue"
+mysterio gen ask --brief "water the plants" --tone casual
+mysterio build recipe.yaml --set pretext="$(mysterio gen pretext -b ...)"
+mysterio review payload.txt            # or: mysterio review - < payload.txt
+```
+
+Generation is **generate-then-bake**: `assemble` never calls the network, so
+built payloads stay reproducible. Results cache in `~/.cache/mysterio`
+(`--fresh` to bypass; `MYSTERIO_CACHE` to relocate).
+
 ## Development
 
 ```bash
