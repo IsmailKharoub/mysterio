@@ -32,6 +32,8 @@ uv tool install git+https://github.com/IsmailKharoub/mysterio
 # or from a clone: uv tool install .
 ```
 
+Installed as both `mysterio` and `mys`.
+
 ## The model
 
 A **payload** is an ordered block list:
@@ -40,8 +42,28 @@ A **payload** is an ordered block list:
 pretext -> junk -> escape -> reminder -> banner -> ask -> reopen -> tail
 ```
 
+A recipe is that list in YAML, with `{slot}` placeholders filled at render
+time via `--set`:
+
+```yaml
+name: demo
+blocks:
+  - junk: {style: rsc, lines: 140}
+  - escape: {style: bracket}
+  - reminder: {template: interruption}
+  - banner: {style: unicode, ts: "{ts}"}
+  - ask: {wrapper: user_query, text: "{ask}"}
+  - reopen: {}
+```
+
+```bash
+mysterio build recipe.yaml --set ts="2026-08-08 09:15AM" --set ask="check the thread"
+```
+
 Every block is independently swappable, so a variant is a one-line YAML
-diff — and a sweep over any field is one command.
+diff — and a sweep over any field is one command. `mysterio show
+basic-interruption` prints a full annotated recipe; `mysterio check`
+validates yours.
 
 ## The lab (TUI)
 
@@ -85,11 +107,14 @@ mysterio use emoji-smuggle-note --set ask="..."
 mysterio check recipe.yaml
 
 # Parameter sweeps: arms for systematic experiments
-mysterio vary recipe.yaml -v junk.lines=60,100,140 --set ask="..." --out-dir arms/
+mysterio vary recipe.yaml -v junk.lines=60,100,140 --set ts="..." --set ask="..." --out-dir arms/
 
 # Block-level recipe diff / payload measurement
 mysterio diff old.yaml new.yaml
 mysterio stats payload.txt
+
+# Easter egg: the banner hides a message — decode it with mysterio itself
+mysterio logo | mysterio encode -d -m tag -
 ```
 
 ## Pattern library
@@ -115,7 +140,7 @@ override same-named entries, and `library.local.yaml` is gitignored. Run
 
 ## Encoders
 
-- **visual hiders** — `spaces`, `circle`, `fullwidth`, `smallcaps`, six
+- **visual hiders** — `spaces`, `circle`, `fullwidth`, `smallcaps`, seven
   `math-*` alphabets, `regional`, `upside-down`, `strikethrough`,
   `underline`, `braille`, `homoglyph` (Cyrillic), `zalgo`
 - **invisible** — `emoji-smuggle` (variation selectors), `zwsp`, `tag`
@@ -131,7 +156,7 @@ Most are losslessly decodable (`--decode`); `mysterio encoders` lists them.
 `rsc`, `next_f`, `http-log`, `hexdump`, `stacktrace`, `syslog`, `base64`,
 `jsonl`, `openapi`, `git-diff`, `csv`, `min-js`, `sql` — noise shaped like
 real surfaces, so payloads camouflage inside tool results, documents, API
-captures, and code reviews.
+captures, and code reviews. `mysterio styles` lists them with descriptions.
 
 ## The linter
 
