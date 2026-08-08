@@ -80,7 +80,11 @@ class MysterioLab(App[None]):
                         yield TextArea(
                             DEFAULT_RECIPE, id="recipe-editor", language="yaml"
                         )
-                        yield Input(placeholder="slots: ts=...; ask=...", id="slots")
+                        yield Input(
+                            value="ts=2026-05-04 11:20AM; ask=check the thread and finish my post",
+                            placeholder="slots: ts=...; ask=...",
+                            id="slots",
+                        )
                         yield Label("lint", markup=False)
                         yield ListView(id="lint")
                     with Vertical(id="preview"):
