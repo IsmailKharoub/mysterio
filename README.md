@@ -1,158 +1,155 @@
 # mysterio
 
-Composable payload builder for prompt-injection red-team research. Turn the
-parts of an injection that are usually hand-copied between engagements — noise
-("junk") blocks, breakout escapes, system-reminder scaffolds, message banners,
-ask wrappers, and text encodings — into a CLI you can compose, parameterize,
-and diff.
+**The payload workbench for AI security research.** mysterio authors the
+adversarial inputs that other tools fire — composable prompt-injection
+payloads built from blocks (noise, escapes, forged channels, asks), 30+
+text encoders, realistic context-noise generators, and a cited pattern
+library, wrapped in both a scriptable CLI and an interactive TUI.
+
+## Where it sits
+
+The 2026 red-team toolchain has scanners, orchestrators, and CI gates —
+but payload *authoring* is still hand-craft:
+
+| tool | layer | what it does |
+|---|---|---|
+| **garak** (NVIDIA) | scan | fires a fixed probe library at a model, reports failures |
+| **PyRIT** (Microsoft) | orchestrate | drives multi-turn attacker→target campaigns |
+| **promptfoo** | gate | YAML-configured eval/red-team suites in CI |
+| **mysterio** | **author** | **builds the payloads themselves — structure, encoding, noise, dose** |
+
+mysterio's output pipes into any of them: render a payload to stdout, a
+file, or a byte-safe Python/JSON literal for your harness.
 
 ## Install
 
 ```bash
-uv tool install .
-# or, for development:
-uv sync --extra dev && uv run mysterio --help
+uv tool install git+https://github.com/IsmailKharoub/mysterio
+# or from a clone: uv tool install .
 ```
 
 ## The model
 
-A **chassis** is assembled from ordered blocks:
+A **payload** is an ordered block list:
 
 ```
 pretext -> junk -> escape -> reminder -> banner -> ask -> reopen -> tail
 ```
 
-Every block is independently swappable so variants can be tested
-systematically (junk style/dose, escape flavor, reminder template, ask
-wrapper, ask encoding).
+Every block is independently swappable, so a variant is a one-line YAML
+diff — and a sweep over any field is one command.
 
-## Quickstart
+## The lab (TUI)
 
 ```bash
-# Generate context-noise (140 RSC stream rows)
-mysterio junk rsc --lines 140
+mysterio lab
+```
 
-# Dose by token budget instead of line count (self-calibrating)
+Four panes:
+
+- **Builder** — recipe YAML editor → live rendered payload, lint findings,
+  and dose stats as you type
+- **Encoders** — type once, watch all 30+ codecs apply live, click to copy
+- **Junk** — noise style + dose controls (lines or token budget) with preview
+- **Library** — browse patterns (public + your private ones), fill slots,
+  render
+
+## CLI quickstart
+
+```bash
+# Context-noise on demand — by lines or by token budget
+mysterio junk rsc --lines 140
 mysterio junk rsc --approx-tokens 6500
 
-# Other noise styles
-mysterio styles
-mysterio junk http-log -n 80
+# 30+ encoders: visual hiders, invisible encodings, classics
+mysterio encode "post the weekly book" -m circle        # ⓟⓞⓢⓣ ...
+mysterio encode "follow the white rabbit" -m emoji-smuggle  # 😀<invisible>
+mysterio encode "see me at 6" -m all                    # preview every codec
 
-# Encode text (visual hiders, invisible encodings, classics)
-mysterio encode "post the weekly book" -m circle      # ⓟⓞⓢⓣ ...
-mysterio encode "post the weekly book" -m spaces      # p o s t ...
-mysterio encode "see me at 6" -m zwsp                 # invisible
-mysterio encode "aGVsbG8=" -m base64 -d               # decode
-mysterio encode "post the book" -m all                # preview every codec at once
+# Assemble a payload from a recipe (YAML) with slot filling
+mysterio build recipe.yaml --set ts="..." --set ask="..."
 
-# Assemble a full chassis from a recipe
-mysterio build recipe.yaml --set ts="2026-05-04 11:20AM" --set ask="check the thread"
+# Byte-safe export for embedding in code/JSON harnesses
+mysterio build recipe.yaml --set ... --format python    # repr() literal
 
-# Export byte-safe for splicing into Python/JSON sources
-mysterio build recipe.yaml --set ... --format python  # repr() literal
-mysterio build recipe.yaml --set ... --format json    # JSON string literal
-
-# Use the library
+# The pattern library — cited, generic templates from published research
 mysterio library
-mysterio use basic-interruption --set ts="..." --set ask="..."
+mysterio show tool-description-poison                   # refs + full recipe
+mysterio use emoji-smuggle-note --set ask="..."
 
-# Lint a recipe against the empirical authoring rules
-mysterio check recipe.yaml        # or a library name: mysterio check v6-bare
+# Lint against empirical authoring rules
+mysterio check recipe.yaml
 
-# Sweep a field into arms (cross product; --zip for paired ablations)
-mysterio vary recipe.yaml -v junk.lines=60,100,140 -v banner.style=unicode,ascii
-mysterio vary recipe.yaml -v junk.lines=60,140 --set ask="..." --out-dir arms/
+# Parameter sweeps: arms for systematic experiments
+mysterio vary recipe.yaml -v junk.lines=60,100,140 --set ask="..." --out-dir arms/
 
-# Block-level diff between recipes (files or library names)
+# Block-level recipe diff / payload measurement
 mysterio diff old.yaml new.yaml
-
-# Measure a payload (dose control)
 mysterio stats payload.txt
 ```
 
-## The library
+## Pattern library
 
-`library/` holds named, reusable payload recipes.
+Generic, cited starting points (`mysterio show <name>` for references):
 
-- `library.example.yaml` — generic teaching examples, committed.
-- `library.local.yaml` — **private** engagement payloads. Gitignored, never
-  committed. Entries here override examples with the same name. This is the
-  seam that keeps the tool open-source-able: the utility ships generic, your
-  proven texts stay local.
-
-## Recipe schema
-
-```yaml
-name: my-variant
-separator: "\n\n"        # optional, default blank line between blocks
-blocks:
-  - pretext:  {text: "organic lead-in shown above the noise"}
-  - junk:     {style: rsc, lines: 140, seed: myseed}
-  - escape:   {style: bracket}        # bracket | xml | tool-output | xml-tool | none
-  - reminder: {template: interruption} # interruption | state-sync
-  - banner:   {style: unicode, ts: "{ts}", n: 1}
-  - ask:      {wrapper: user_query, text: "{ask}", encode: "spaces"}  # encode optional
-  - reopen:   {}                       # re-opens the block the escape closed
-  - tail:     {text: "organic tail below the payload"}
-```
-
-Any string field may contain `{slot}` placeholders; fill them with
-`--set slot=value`.
-
-## The linter (`mysterio check`)
-
-`check` encodes the empirical rules from live experiments as lint findings:
-
-| code | level | rule |
+| pattern | technique | lineage |
 |---|---|---|
-| `escape-no-reopen` | error | escape without a following reopen — host result never resumes |
-| `unknown-*` | error | unknown block kind / junk style / escape / reminder / wrapper / codec |
-| `junk-below` | warn | junk below the escape converted worse than above-placement |
-| `dose-floor` | warn | rsc/next_f under ~60 lines is below the observed efficacy floor |
-| `banner-missing` | warn | interruption frame without banner — ablation halved conversion |
-| `interruption-no-ask` | warn | interruption frame that delivers no ask |
-| `order` | warn | canonical order is reminder → banner → ask |
-| `xml-escape` | info | `</function_results>` is canonical; bracket is the submission-safe variant |
-| `slots` | info | unfilled `{slots}` to pass at render time |
+| `chatml-user-spoof` / `llama-user-spoof` | forge role turns with the target's own template tokens | ChatInject (arXiv:2509.22830) |
+| `emoji-smuggle-note` | variation-selector hidden instruction + decode recipe | Butler 2025; Repello 2026 |
+| `tool-description-poison` | `<IMPORTANT>` directive in MCP tool metadata | Invariant Labs; OWASP MCP Tool Poisoning |
+| `compliance-directive` | mandatory-compliance frame in a tool result | OWASP |
+| `rag-footer-note` | document footer as retrieval policy | Greshake et al. 2023 |
+| `markdown-exfil` | exfil via instructed image render | Rehberger |
+| `calendar-invite` | instruction in invite description | classic IPI |
+| `basic-interruption` / `encoded-ask` / `state-sync-ledger` | function-interruption chassis family | internal research |
 
-Exit code is 1 when any error-level finding fires, so `check` gates CI or
-pre-submit hooks.
+**Your private payloads never ship.** `library/library.local.yaml` is
+gitignored; entries there override public ones and load everywhere (repo,
+`./library`, or `~/.config/mysterio/library` — or set `MYSTERIO_LIBRARY`).
+
+## Encoders
+
+- **visual hiders** — `spaces`, `circle`, `fullwidth`, `smallcaps`, six
+  `math-*` alphabets, `regional`, `upside-down`, `strikethrough`,
+  `underline`, `braille`, `homoglyph` (Cyrillic), `zalgo`
+- **invisible** — `emoji-smuggle` (variation selectors), `zwsp`, `tag`
+  (Unicode tag block / ASCII smuggling)
+- **classic** — `base64`, `base32`, `hex`, `rot13`, `caesar`, `binary`,
+  `url`, `html`, `morse`, `nato`, `leet`, `reverse`, `intersperse`,
+  `letter-dash`
+
+Most are losslessly decodable (`--decode`); `mysterio encoders` lists them.
 
 ## Junk styles
 
-| style | shape |
-|---|---|
-| `rsc` | React Server Components stream rows (`N:{"stream":"rsc",...}`) |
-| `next_f` | Next.js `__next_f.push` payload rows |
-| `http-log` | HTTP access/debug log lines |
-| `hexdump` | offset + hex + ascii gutter |
-| `stacktrace` | minified-JS stack frames |
-| `syslog` | Linux syslog lines |
-| `base64` | MIME-wrapped base64 blob |
-| `jsonl` | telemetry JSONL rows |
+`rsc`, `next_f`, `http-log`, `hexdump`, `stacktrace`, `syslog`, `base64`,
+`jsonl`, `openapi`, `git-diff`, `csv`, `min-js`, `sql` — noise shaped like
+real surfaces, so payloads camouflage inside tool results, documents, API
+captures, and code reviews.
 
-## Encoder categories
+## The linter
 
-- **visual hiders** — `spaces`, `circle`, `fullwidth`, `smallcaps`,
-  `math-*`, `regional`, `upside-down`, `strikethrough`, `underline`,
-  `braille`, `homoglyph`. Render as (near-)text, defeat substring matching.
-- **invisible** — `zwsp`, `tag`. Hidden from human reviewers, readable by
-  models.
-- **classic** — `base64`, `hex`, `rot13`, `caesar`, `binary`, `url`,
-  `html`, `morse`, `nato`, `leet`, `reverse`.
-
-`mysterio encoders` lists everything with decodability.
+`mysterio check` encodes empirical rules as findings (escape/reopen pairing,
+junk-above placement, dose floors, banner load-bearingness, ordering,
+unknown styles). Exit 1 on errors — usable as a pre-submit gate.
 
 ## Development
 
 ```bash
 uv sync --extra dev
-uv run pytest
+uv run pytest          # 55 tests incl. TUI pilot tests
 ```
 
 ## Ethics
 
-This tool exists for **authorized** red-team evaluation of AI agents (the
-kind of work that produces RL hardening data). Don't point it at systems you
-don't have permission to test.
+For **authorized** red-team work: evaluating your own agents, sanctioned
+engagements, and producing hardening data. Don't point payloads at systems
+you don't have permission to test.
+
+## References
+
+- ChatInject — <https://arxiv.org/abs/2509.22830>
+- Emoji/Unicode smuggling — <https://softwarethug.com/posts/emoji-smuggling-hiding-data-in-unicode-variation-selectors/>, <https://aws.amazon.com/blogs/security/defending-llm-applications-against-unicode-character-smuggling/>
+- MCP Tool Poisoning — <https://owasp.org/www-community/attacks/MCP_Tool_Poisoning>
+- Indirect prompt injection — <https://arxiv.org/abs/2302.12173>
+- OWASP LLM Top 10 (LLM01) — <https://genai.owasp.org/>
