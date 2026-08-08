@@ -15,6 +15,7 @@ from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.theme import Theme
 from textual.widgets import (
     Button,
     Checkbox,
@@ -70,17 +71,34 @@ class _CopyTable(DataTable):
             self._post_selected_message()
 
 
+# Brand palette, lifted from the logo: ink-indigo dome, violet smoke,
+# cyan glyphs, magenta tagline.
+MYSTERIO_THEME = Theme(
+    name="mysterio",
+    dark=True,
+    primary="#8b5cf6",
+    secondary="#22d3ee",
+    accent="#e879f9",
+    warning="#fbbf24",
+    error="#fb7185",
+    success="#34d399",
+    background="#12142a",
+    surface="#1b1e35",
+    panel="#232647",
+    foreground="#e6e8f5",
+)
+
 # Structural preview highlighting: noise recedes, attack structure pops.
 _KIND_STYLES = {
     "junk": "dim",
-    "escape": "bold magenta",
-    "reminder": "bold yellow",
-    "banner": "cyan",
-    "ask": "bold green",
-    "reopen": "bold magenta",
+    "escape": "bold #e879f9",
+    "reminder": "bold #fbbf24",
+    "banner": "#22d3ee",
+    "ask": "bold #34d399",
+    "reopen": "bold #e879f9",
 }
 
-_INVISIBLE_STYLE = "bold white on red"
+_INVISIBLE_STYLE = "bold white on #e11d48"
 
 
 def _reveal(part: str, base_style: str = "") -> Text:
@@ -125,6 +143,7 @@ def _render_parts(
 
 class MysterioLab(App[None]):
     TITLE = "mysterio lab"
+    SUB_TITLE = "the payload workbench"
     CSS = """
     #editor { width: 1fr; }
     #preview, #junk-preview, #lib-preview { width: 1fr; border: solid $primary; }
@@ -214,6 +233,8 @@ class MysterioLab(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        self.register_theme(MYSTERIO_THEME)
+        self.theme = "mysterio"
         self._library: dict | None = None
         table = self.query_one("#encode-table", DataTable)
         table.add_columns("codec", "category", "output")
