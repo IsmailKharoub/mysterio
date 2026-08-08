@@ -28,19 +28,21 @@ from . import junk as J
 from . import encoders as E
 
 
-def library_dir() -> Path:
-    """Resolution order: $MYSTERIO_LIBRARY, ./library, ~/.config/mysterio/library,
-    package-relative (dev repo)."""
-    env = os.environ.get("MYSTERIO_LIBRARY")
-    if env:
-        return Path(env)
-    cwd = Path.cwd() / "library"
-    if cwd.is_dir():
-        return cwd
+BUNDLED_LIBRARY_DIR = Path(__file__).resolve().parent / "data"
+
+
+def library_dirs() -> list[Path]:
+    """Library layers, lowest precedence first: the bundled public library,
+    then ./library, then ~/.config/mysterio/library, then $MYSTERIO_LIBRARY.
+    Later layers override earlier ones entry-by-entry."""
+    dirs = [BUNDLED_LIBRARY_DIR, Path.cwd() / "library"]
     xdg = Path.home() / ".config" / "mysterio" / "library"
     if xdg.is_dir():
-        return xdg
-    return Path(__file__).resolve().parents[2] / "library"
+        dirs.append(xdg)
+    env = os.environ.get("MYSTERIO_LIBRARY")
+    if env:
+        dirs.append(Path(env))
+    return dirs
 
 
 class RecipeError(ValueError):
@@ -119,17 +121,20 @@ def load_recipe_file(path: Path) -> dict[str, Any]:
 
 
 def load_library() -> dict[str, dict[str, Any]]:
-    """Merge library YAML files. Later files override earlier ones;
-    library.local.yaml (gitignored, private) loads last and wins."""
+    """Merge library YAML across all layers (see library_dirs). Within a
+    layer, files merge in name order; across layers, later dirs override
+    earlier ones entry-by-entry — so library.local.yaml (gitignored,
+    private) wins over the bundled public entries."""
     out: dict[str, dict[str, Any]] = {}
-    lib_dir = library_dir()
-    if not lib_dir.is_dir():
-        return out
-    for path in sorted(lib_dir.glob("*.yaml")):
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        entries = data.get("payloads", {})
-        for name, entry in entries.items():
-            entry = dict(entry)
-            entry["_source"] = path.name
-            out[name] = entry
+    for lib_dir in library_dirs():
+        if not lib_dir.is_dir():
+            continue
+        bundled = lib_dir == BUNDLED_LIBRARY_DIR
+        for path in sorted(lib_dir.glob("*.yaml")):
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            entries = data.get("payloads", {})
+            for name, entry in entries.items():
+                entry = dict(entry)
+                entry["_source"] = "bundled" if bundled else path.name
+                out[name] = entry
     return out

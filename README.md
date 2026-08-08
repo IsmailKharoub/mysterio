@@ -103,9 +103,11 @@ Generic, cited starting points (`mysterio show <name>` for references):
 | `calendar-invite` | instruction in invite description | classic IPI |
 | `basic-interruption` / `encoded-ask` / `state-sync-ledger` | function-interruption chassis family | internal research |
 
-**Your private payloads never ship.** `library/library.local.yaml` is
-gitignored; entries there override public ones and load everywhere (repo,
-`./library`, or `~/.config/mysterio/library` — or set `MYSTERIO_LIBRARY`).
+**Your private payloads never ship.** The public patterns are bundled with
+the package; your own YAML layers on top from `./library`, then
+`~/.config/mysterio/library`, then `$MYSTERIO_LIBRARY` — later layers
+override same-named entries, and `library.local.yaml` is gitignored. Run
+`mysterio init` to scaffold a private starter library.
 
 ## Encoders
 
