@@ -15,6 +15,7 @@ from . import blocks as B
 from . import encoders as E
 from . import humanize as H
 from . import junk as J
+from .recipe import _known
 from .recipe import library_dirs as _library_dirs
 
 DOSE_FLOOR_LINES = 60
@@ -93,7 +94,7 @@ def lint_recipe(
             findings.append(
                 Finding("error", "unknown-block", f"unknown block kind {kind!r}")
             )
-        elif kind == "junk" and spec.get("style") not in J.STYLES:
+        elif kind == "junk" and not _known(spec.get("style"), J.STYLES):
             findings.append(
                 Finding(
                     "error",
@@ -101,7 +102,7 @@ def lint_recipe(
                     f"unknown junk style {spec.get('style')!r}",
                 )
             )
-        elif kind == "escape" and spec.get("style") not in B.ESCAPES:
+        elif kind == "escape" and not _known(spec.get("style"), B.ESCAPES):
             findings.append(
                 Finding(
                     "error",
@@ -109,7 +110,7 @@ def lint_recipe(
                     f"unknown escape style {spec.get('style')!r}",
                 )
             )
-        elif kind == "reminder" and spec.get("template") not in B.REMINDER_TEMPLATES:
+        elif kind == "reminder" and not _known(spec.get("template"), B.REMINDER_TEMPLATES):
             findings.append(
                 Finding(
                     "error",
@@ -117,7 +118,7 @@ def lint_recipe(
                     f"unknown reminder template {spec.get('template')!r}",
                 )
             )
-        elif kind == "banner" and spec.get("style", "unicode") not in B.BANNER_STYLES:
+        elif kind == "banner" and not _known(spec.get("style", "unicode"), B.BANNER_STYLES):
             findings.append(
                 Finding(
                     "error",
@@ -126,7 +127,7 @@ def lint_recipe(
                 )
             )
         elif kind == "ask":
-            if spec.get("wrapper", "user_query") not in B.ASK_WRAPPERS:
+            if not _known(spec.get("wrapper", "user_query"), B.ASK_WRAPPERS):
                 findings.append(
                     Finding(
                         "error",
@@ -136,7 +137,7 @@ def lint_recipe(
                 )
             if (
                 "encode" in spec
-                and spec["encode"] not in E.CODECS
+                and not _known(spec["encode"], E.CODECS)
                 and not _SLOT_RE.search(str(spec["encode"]))
             ):
                 findings.append(
@@ -146,9 +147,13 @@ def lint_recipe(
                 )
             if "humanize" in spec:
                 hspec = spec["humanize"]
-                hname = hspec if isinstance(hspec, str) else (hspec or {}).get("name")
+                hname = (
+                    hspec
+                    if isinstance(hspec, str)
+                    else hspec.get("name") if isinstance(hspec, dict) else None
+                )
                 # lazy file scan — only when a recipe actually uses humanize
-                if hname and hname not in H.load_humanizers(_library_dirs()):
+                if hname and not _known(hname, H.load_humanizers(_library_dirs())):
                     findings.append(
                         Finding(
                             "error",
@@ -254,7 +259,8 @@ def lint_recipe(
         )
 
     if i_escape is not None:
-        style = str(blocks[i_escape].get("escape", {}).get("style", ""))
+        espec = blocks[i_escape].get("escape", {})
+        style = str(espec.get("style", "")) if isinstance(espec, dict) else ""
         if style == "xml":
             findings.append(
                 Finding(

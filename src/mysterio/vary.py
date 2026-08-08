@@ -31,10 +31,18 @@ def _valid_fields(recipe: dict[str, Any], kind: str) -> set[str]:
     if kind != "junk":
         return _BLOCK_FIELDS.get(kind, set())
     fields = {"style"}
-    for raw in recipe.get("blocks", []):
+    blocks = recipe.get("blocks", [])
+    if not isinstance(blocks, list):
+        return fields
+    for raw in blocks:
         if isinstance(raw, dict) and list(raw) == ["junk"]:
-            style = (raw["junk"] or {}).get("style")
-            if style in J.STYLES:
+            spec = raw["junk"]
+            style = spec.get("style") if isinstance(spec, dict) else None
+            try:
+                known = style in J.STYLES
+            except TypeError:
+                known = False
+            if known:
                 fields |= set(inspect.signature(J.STYLES[style].generate).parameters)
     return fields
 
@@ -66,9 +74,12 @@ def apply_vary(recipe: dict[str, Any], path: str, value: Any) -> dict[str, Any]:
     Validates the field name up front so a typo fails the whole sweep —
     dry run included — instead of crashing at render time."""
     kind, field = path.split(".", 1)
+    raw_blocks = recipe.get("blocks", [])
+    if not isinstance(raw_blocks, list):
+        raise ValueError("recipe needs a 'blocks' list")
     blocks = [
         next(iter(r.items()))
-        for r in recipe.get("blocks", [])
+        for r in raw_blocks
         if isinstance(r, dict) and len(r) == 1
     ]
     if kind not in {k for k, _ in blocks}:

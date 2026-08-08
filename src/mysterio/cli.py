@@ -71,6 +71,9 @@ def _clean_errors():
     except yaml.YAMLError as e:
         err_console.print(f"error: invalid YAML — {e}")
         raise typer.Exit(2) from e
+    except UnicodeDecodeError as e:
+        err_console.print(f"error: file is not valid UTF-8 — {e}")
+        raise typer.Exit(2) from e
     except (R.RecipeError, H.HumanizeError) as e:
         err_console.print(f"error: {e}")
         raise typer.Exit(2) from e
@@ -445,6 +448,9 @@ def diff(
     with _clean_errors():
         la, lsrc = _resolve_recipe(left)
         ra, rsrc = _resolve_recipe(right)
+        for label, recipe in ((left, la), (right, ra)):
+            if not isinstance(recipe.get("blocks", []), list):
+                raise R.RecipeError(f"{label}: recipe needs a 'blocks' list")
     lb = la.get("blocks", [])
     rb = ra.get("blocks", [])
 

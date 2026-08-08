@@ -186,6 +186,13 @@ def _from_spec(name: str, spec: dict[str, Any], source: str) -> Humanizer:
             f"{source}: humanizer {name!r} has unknown fields: "
             f"{', '.join(sorted(unknown))} (known: {', '.join(sorted(known))})"
         )
+    try:
+        filler_rate = float(spec.get("filler_rate", 0.0))
+        typo_rate = float(spec.get("typo_rate", 0.0))
+    except (TypeError, ValueError) as e:
+        raise HumanizeError(
+            f"{source}: humanizer {name!r} rates must be numbers — {e}"
+        ) from e
     return Humanizer(
         name,
         description=str(spec.get("description", "")),
@@ -194,8 +201,8 @@ def _from_spec(name: str, spec: dict[str, Any], source: str) -> Humanizer:
         starters=tuple(spec.get("starters", ())),
         replacements=dict(spec.get("replacements", {})),
         fillers=tuple(spec.get("fillers", ())),
-        filler_rate=float(spec.get("filler_rate", 0.0)),
-        typo_rate=float(spec.get("typo_rate", 0.0)),
+        filler_rate=filler_rate,
+        typo_rate=typo_rate,
         ellipsis=bool(spec.get("ellipsis", False)),
         prompt=str(spec.get("prompt", "")),
         source=source,

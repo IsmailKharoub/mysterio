@@ -92,6 +92,14 @@ def _need(spec: dict[str, Any], kind: str, field: str) -> Any:
     return spec[field]
 
 
+def _known(value: Any, registry: dict) -> bool:
+    """Membership check that survives unhashable fuzz values (lists, dicts)."""
+    try:
+        return value in registry
+    except TypeError:
+        return False
+
+
 def assemble_parts(
     recipe: dict[str, Any], slots: dict[str, str] | None = None
 ) -> list[tuple[str, str]]:
@@ -116,29 +124,36 @@ def assemble_parts(
             parts.append((kind, str(_need(spec, kind, "text"))))
         elif kind == "junk":
             style = _need(spec, kind, "style")
-            if style not in J.STYLES:
+            if not _known(style, J.STYLES):
                 raise RecipeError(f"unknown junk style {style!r}; see `mysterio styles`")
             kwargs = {k: v for k, v in spec.items() if k != "style"}
-            parts.append((kind, J.generate(style, **kwargs)))
+            try:
+                parts.append((kind, J.generate(style, **kwargs)))
+            except (TypeError, ValueError) as e:
+                raise RecipeError(f"junk {style!r} rejected its fields: {e}") from e
         elif kind == "escape":
             style = _need(spec, kind, "style")
-            if style not in B.ESCAPES:
+            if not _known(style, B.ESCAPES):
                 raise RecipeError(f"unknown escape style {style!r}")
             close, reopen = B.ESCAPES[style]
             parts.append((kind, close))
         elif kind == "reminder":
             template = _need(spec, kind, "template")
-            if template not in B.REMINDER_TEMPLATES:
+            if not _known(template, B.REMINDER_TEMPLATES):
                 raise RecipeError(f"unknown reminder template {template!r}")
             slots_for = {k: v for k, v in spec.items() if k != "template"}
             parts.append((kind, B.reminder(template, **slots_for)))
         elif kind == "banner":
             style = spec.get("style", "unicode")
-            if style not in B.BANNER_STYLES:
+            if not _known(style, B.BANNER_STYLES):
                 raise RecipeError(f"unknown banner style {style!r}")
-            parts.append(
-                (kind, B.banner(style, ts=spec.get("ts", ""), n=int(spec.get("n", 1))))
-            )
+            try:
+                n = int(spec.get("n", 1))
+            except (TypeError, ValueError) as e:
+                raise RecipeError(
+                    f"banner 'n' must be an integer, got {spec.get('n')!r}"
+                ) from e
+            parts.append((kind, B.banner(style, ts=str(spec.get("ts", "")), n=n)))
         elif kind == "ask":
             text = str(_need(spec, kind, "text"))
             if "humanize" in spec:
@@ -155,17 +170,17 @@ def assemble_parts(
                         f"humanize expects a name or a name/seed map, got {hspec!r}"
                     )
                 regs = H.load_humanizers(library_dirs())
-                if hname not in regs:
+                if not _known(hname, regs):
                     raise RecipeError(
                         f"unknown humanizer {hname!r}; see `mysterio humanizers`"
                     )
                 text = regs[hname].apply(text, None if hseed is None else str(hseed))
             if "encode" in spec:
-                if spec["encode"] not in E.CODECS:
+                if not _known(spec["encode"], E.CODECS):
                     raise RecipeError(f"unknown encoder {spec['encode']!r}; see `mysterio encoders`")
                 text = E.encode(spec["encode"], text)
             wrapper = spec.get("wrapper", "user_query")
-            if wrapper not in B.ASK_WRAPPERS:
+            if not _known(wrapper, B.ASK_WRAPPERS):
                 raise RecipeError(f"unknown ask wrapper {wrapper!r}")
             parts.append((kind, B.ask(text, wrapper)))
         elif kind == "reopen":
@@ -180,6 +195,8 @@ def assemble_parts(
 def assemble(recipe: dict[str, Any], slots: dict[str, str] | None = None) -> str:
     parts = assemble_parts(recipe, slots)
     sep = recipe.get("separator", "\n\n")
+    if not isinstance(sep, str):
+        raise RecipeError(f"separator must be a string, got {sep!r}")
     return sep.join(p for _, p in parts if p)
 
 

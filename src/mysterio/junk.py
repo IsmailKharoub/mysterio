@@ -299,7 +299,15 @@ STYLES: dict[str, JunkStyle] = {
 
 
 def generate(style: str, **kwargs: object) -> str:
-    return STYLES[style].generate(**kwargs)
+    """Dispatch to a style's generator. Numeric dose params are coerced to
+    non-negative ints — a negative size reaches C level (SystemError) in
+    token_bytes, so it is clamped here rather than in every generator."""
+    gen = STYLES[style].generate
+    for key, value in list(kwargs.items()):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        kwargs[key] = max(0, int(value))
+    return gen(**kwargs)
 
 
 def lines_for_tokens(style: str, approx_tokens: int, seed: str = "cal") -> int:
