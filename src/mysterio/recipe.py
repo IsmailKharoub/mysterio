@@ -108,6 +108,8 @@ def assemble_parts(
         if not isinstance(raw, dict) or len(raw) != 1:
             raise RecipeError(f"each block must be a single-key map, got: {raw!r}")
         kind, spec = next(iter(raw.items()))
+        if spec is not None and not isinstance(spec, dict):
+            raise RecipeError(f"{kind} block spec must be a mapping, got {spec!r}")
         spec = _subst(spec or {}, slots)
 
         if kind == "pretext":

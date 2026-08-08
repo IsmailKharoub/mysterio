@@ -77,6 +77,25 @@ async def test_builder_yaml_error_surfaces():
 
 
 @pytest.mark.asyncio
+async def test_builder_survives_mid_typing_states():
+    """A half-edited block line parses as a string entry — lint must not crash."""
+    app = MysterioLab()
+    async with app.run_test() as pilot:
+        editor = app.query_one("#recipe-editor", TextArea)
+        editor.text = (
+            "name: scratch\n"
+            "blocks:\n"
+            "  - junk: {style: rsc, lines: 140}\n"
+            "  - banner}\n"
+            "  - ask: {wrapper: plain, text: hi}\n"
+        )
+        await pilot.pause()
+        lint = app.query_one("#lint")
+        items = [str(item.query_one("Label").render()) for item in lint.children]
+        assert any("bad-block" in i for i in items)
+
+
+@pytest.mark.asyncio
 async def test_encoder_table_populates():
     app = MysterioLab()
     async with app.run_test() as pilot:

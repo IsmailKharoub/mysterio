@@ -67,8 +67,17 @@ def lint_recipe(
             kinds.append("?")
             continue
         kind, spec = next(iter(raw.items()))
-        spec = spec or {}
         kinds.append(kind)
+        if spec is not None and not isinstance(spec, dict):
+            findings.append(
+                Finding(
+                    "error",
+                    "bad-block",
+                    f"{kind} block spec must be a mapping, got {spec!r}",
+                )
+            )
+            continue
+        spec = spec or {}
         slots |= _slots_in(spec)
 
         if kind not in {
@@ -185,13 +194,16 @@ def lint_recipe(
             )
 
     for raw in blocks:
+        if not isinstance(raw, dict) or len(raw) != 1:
+            continue  # already flagged as bad-block in the first pass
         kind, spec = next(iter(raw.items()))
-        spec = spec or {}
-        if (
-            kind == "junk"
-            and spec.get("style") in ("rsc", "next_f")
-            and int(spec.get("lines", 0)) < DOSE_FLOOR_LINES
-        ):
+        if not isinstance(spec, dict):
+            continue
+        try:
+            dose = int(spec.get("lines", 0))
+        except (TypeError, ValueError):
+            continue  # slot placeholder — dose is decided at render time
+        if kind == "junk" and spec.get("style") in ("rsc", "next_f") and dose < DOSE_FLOOR_LINES:
             findings.append(
                 Finding(
                     "warn",
@@ -204,7 +216,9 @@ def lint_recipe(
     i_reminder, i_banner, i_ask = idx("reminder"), idx("banner"), idx("ask")
     reminder_tpl = ""
     if i_reminder is not None:
-        reminder_tpl = str(blocks[i_reminder].get("reminder", {}).get("template", ""))
+        rspec = blocks[i_reminder].get("reminder", {})
+        if isinstance(rspec, dict):
+            reminder_tpl = str(rspec.get("template", ""))
     if reminder_tpl == "interruption" and i_banner is None:
         findings.append(
             Finding(

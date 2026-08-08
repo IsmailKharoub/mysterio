@@ -49,6 +49,11 @@ def test_unknown_block_raises():
         R.assemble({"blocks": [{"nonsense": {}}]})
 
 
+def test_scalar_spec_raises_clean():
+    with pytest.raises(R.RecipeError, match="must be a mapping"):
+        R.assemble({"blocks": [{"junk": "rsc"}]})
+
+
 def test_ask_encoding():
     recipe = {
         "blocks": [{"ask": {"wrapper": "plain", "text": "abc", "encode": "circle"}}]

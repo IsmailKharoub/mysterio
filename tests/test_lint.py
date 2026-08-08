@@ -61,6 +61,16 @@ def test_interruption_without_banner_warns():
     assert "banner-missing" in codes(L.lint_recipe(r))
 
 
+def test_malformed_blocks_never_crash():
+    """Mid-typing states in the lab: string entries, scalar specs, slot doses."""
+    findings = L.lint_recipe({"blocks": ["banner}", {"junk": "rsc"}, {"ask": None}]})
+    codes = {f.code for f in findings}
+    assert "bad-block" in codes
+    # a slot placeholder in lines must not crash the dose check
+    findings = L.lint_recipe({"blocks": [{"junk": {"style": "rsc", "lines": "{lines}"}}]})
+    assert all(f.code != "dose-floor" for f in findings)
+
+
 def test_unknowns_error():
     r = {
         "blocks": [
