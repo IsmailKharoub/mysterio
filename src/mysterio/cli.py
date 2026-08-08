@@ -35,8 +35,9 @@ def _emit(text: str, out: Optional[Path]) -> None:
     if out is None:
         print(text)
     else:
-        out.write_text(text + "\n", encoding="utf-8")
-        err_console.print(f"wrote {out} ({len(text):,} chars)")
+        written = text + "\n"
+        out.write_text(written, encoding="utf-8")
+        err_console.print(f"wrote {out} ({len(written):,} chars)")
 
 
 def _parse_sets(sets: list[str]) -> dict[str, str]:
@@ -95,7 +96,9 @@ def junk(
         "-t",
         help="Token budget — resolved to lines by self-calibration (overrides --lines)",
     ),
-    seed: str = typer.Option("rsc-chunk", "--seed", "-s", help="Deterministic seed"),
+    seed: Optional[str] = typer.Option(
+        None, "--seed", "-s", help="Deterministic seed (default: per-style)"
+    ),
     out: Optional[Path] = typer.Option(
         None, "--out", "-o", help="Write to file instead of stdout"
     ),
@@ -104,14 +107,21 @@ def junk(
     if style not in J.STYLES:
         err_console.print(f"unknown style {style!r}; see `mysterio styles`")
         raise typer.Exit(2)
+    if lines < 1:
+        raise typer.BadParameter("--lines must be >= 1")
+    kwargs = {"seed": seed} if seed is not None else {}
     if approx_tokens is not None:
-        lines = J.lines_for_tokens(style, approx_tokens, seed)
+        lines = (
+            J.lines_for_tokens(style, approx_tokens, seed)
+            if seed is not None
+            else J.lines_for_tokens(style, approx_tokens)
+        )
         err_console.print(f"~{approx_tokens} tokens -> {lines} lines")
     gen = J.STYLES[style].generate
     if style == "base64":
-        _emit(gen(size=lines * 32, seed=seed), out)
+        _emit(gen(size=lines * 32, **kwargs), out)
     else:
-        _emit(gen(lines=lines, seed=seed), out)
+        _emit(gen(lines=lines, **kwargs), out)
 
 
 @app.command()
@@ -489,8 +499,10 @@ def stats(
     table = Table(title="payload stats")
     table.add_column("metric", style="cyan")
     table.add_column("value", justify="right")
+    # wc -l convention: count newlines, plus one for a final unterminated line
+    line_count = text.count(chr(10)) + (0 if not text or text.endswith(chr(10)) else 1)
     table.add_row("chars", f"{len(text):,}")
-    table.add_row("lines", f"{text.count(chr(10)) + 1:,}")
+    table.add_row("lines", f"{line_count:,}")
     table.add_row("words", f"{len(text.split()):,}")
     table.add_row("~tokens (chars/4)", f"{len(text) // 4:,}")
     console.print(table)

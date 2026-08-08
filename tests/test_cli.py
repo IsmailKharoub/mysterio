@@ -92,6 +92,18 @@ def test_unused_set_slot_warns():
     assert "'ak'" in result.output or "ak=" in result.output
 
 
+def test_junk_lines_floor():
+    assert runner.invoke(app, ["junk", "rsc", "-n", "0"]).exit_code == 2
+
+
+def test_stats_line_count_matches_wc(tmp_path: Path):
+    f = tmp_path / "p.txt"
+    f.write_text("a\nb\nc\n", encoding="utf-8")
+    result = runner.invoke(app, ["stats", str(f)])
+    row = next(line for line in result.output.splitlines() if "lines" in line)
+    assert "3" in row
+
+
 def test_format_python_roundtrip(tmp_path):
     from mysterio.cli import _format_payload
     import ast
