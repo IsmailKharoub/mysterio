@@ -111,7 +111,7 @@ class MysterioLab(App[None]):
                         yield ListView(id="lint")
                     with Vertical(id="preview"):
                         yield Label("rendered payload", markup=False)
-                        yield RichLog(id="render", markup=False)
+                        yield RichLog(id="render", markup=False, wrap=True)
                         yield Label("", id="stats", markup=False)
             with TabPane("Encoders", id="tab-encoders"):
                 yield Input(placeholder="type text to encode...", id="encode-input")
@@ -141,28 +141,39 @@ class MysterioLab(App[None]):
                     yield Label("", id="junk-stats", markup=False)
             with TabPane("Library", id="tab-library"):
                 with Horizontal():
-                    with Vertical():
+                    with Vertical(id="lib-col-list"):
                         yield Label("payloads", markup=False)
                         yield ListView(id="lib-list")
                     with Vertical():
                         yield Label("details", markup=False)
-                        yield RichLog(id="lib-details", markup=False)
+                        yield RichLog(id="lib-details", markup=False, wrap=True)
                         yield Input(
                             placeholder="slots: ts=...; ask=...", id="lib-slots"
                         )
                         yield Button("Render", id="lib-render", variant="primary")
-                        yield RichLog(id="lib-preview", markup=False)
+                        yield Label("preview", markup=False)
+                        yield RichLog(id="lib-preview", markup=False, wrap=True)
                         yield Label("", id="lib-stats", markup=False)
         yield Footer()
 
     def on_mount(self) -> None:
+        self._library: dict | None = None
         table = self.query_one("#encode-table", DataTable)
         table.add_columns("codec", "category", "output")
         table.cursor_type = "row"
         self._refresh_encoders("")
         self._refresh_library_list()
+        view = self.query_one("#lib-list", ListView)
+        if view.children:
+            view.index = 0
         self._render_builder()
         self._render_junk()
+
+    def _lib(self) -> dict:
+        """Library YAML is read once per session, not per arrow key."""
+        if self._library is None:
+            self._library = R.load_library()
+        return self._library
 
     # ------------------------------------------------------------------
     # builder
@@ -189,10 +200,10 @@ class MysterioLab(App[None]):
             stats.update("")
             return
 
-        for f in L.lint_recipe(recipe):
+        slots = _parse_slots(self.query_one("#slots", Input).value)
+        for f in L.lint_recipe(recipe, filled=set(slots)):
             lint_view.append(ListItem(Label(f"[{f.level}] {f.code}: {f.message}")))
 
-        slots = _parse_slots(self.query_one("#slots", Input).value)
         try:
             rendered = R.assemble(recipe, slots)
         except R.RecipeError as e:
@@ -200,8 +211,11 @@ class MysterioLab(App[None]):
             stats.update("")
             return
         render_log.write(Text(rendered))
+        line_count = rendered.count(chr(10)) + (
+            0 if not rendered or rendered.endswith(chr(10)) else 1
+        )
         stats.update(
-            f"{len(rendered):,} chars · {rendered.count(chr(10)) + 1:,} lines · ~{len(rendered) // 4:,} tokens"
+            f"{len(rendered):,} chars · {line_count:,} lines · ~{len(rendered) // 4:,} tokens"
         )
 
     @on(TextArea.Changed, "#recipe-editor")
@@ -292,7 +306,7 @@ class MysterioLab(App[None]):
     def _refresh_library_list(self) -> None:
         view = self.query_one("#lib-list", ListView)
         view.clear()
-        for name, entry in R.load_library().items():
+        for name, entry in self._lib().items():
             src = entry.get("_source", "")
             badge = " [private]" if src.endswith(".local.yaml") else ""
             view.append(ListItem(Label(f"{name}{badge}"), id=name))
@@ -300,7 +314,7 @@ class MysterioLab(App[None]):
     @on(ListView.Highlighted, "#lib-list")
     def library_highlighted(self, event: ListView.Highlighted) -> None:
         if event.item and event.item.id:
-            entry = R.load_library().get(event.item.id, {})
+            entry = self._lib().get(event.item.id, {})
             details = self.query_one("#lib-details", RichLog)
             details.clear()
             details.write(Text(str(entry.get("description", ""))))
@@ -313,10 +327,11 @@ class MysterioLab(App[None]):
         preview = self.query_one("#lib-preview", RichLog)
         stats = self.query_one("#lib-stats", Label)
         preview.clear()
+        stats.update("")
         if not view.highlighted_child or not view.highlighted_child.id:
             preview.write(Text("select a payload first", style="yellow"))
             return
-        entry = R.load_library().get(view.highlighted_child.id, {})
+        entry = self._lib().get(view.highlighted_child.id, {})
         slots = _parse_slots(self.query_one("#lib-slots", Input).value)
         try:
             rendered = R.assemble(entry, slots)

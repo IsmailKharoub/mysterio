@@ -75,7 +75,9 @@ def _subst(value: Any, slots: dict[str, str]) -> Any:
         try:
             return value.format(**slots)
         except KeyError as e:
-            raise RecipeError(f"missing slot {e} (pass --set {e.args[0]}=...)") from e
+            raise RecipeError(
+                f"missing slot {e} (fill via --set {e.args[0]}=... or the lab slots field)"
+            ) from e
     if isinstance(value, dict):
         return {k: _subst(v, slots) for k, v in value.items()}
     if isinstance(value, list):

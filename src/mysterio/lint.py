@@ -45,7 +45,9 @@ def _slots_in(value: Any) -> set[str]:
     return set()
 
 
-def lint_recipe(recipe: dict[str, Any]) -> list[Finding]:
+def lint_recipe(
+    recipe: dict[str, Any], filled: set[str] | None = None
+) -> list[Finding]:
     findings: list[Finding] = []
     blocks = recipe.get("blocks")
     if not isinstance(blocks, list) or not blocks:
@@ -235,12 +237,14 @@ def lint_recipe(recipe: dict[str, Any]) -> list[Finding]:
                 )
             )
 
-    if slots:
+    unfilled = slots - (filled or set())
+    if unfilled:
         findings.append(
             Finding(
                 "info",
                 "slots",
-                f"unfilled slots: {', '.join(sorted(slots))} — fill at render with --set",
+                f"unfilled slots: {', '.join(sorted(unfilled))} — fill at render "
+                "(--set or the lab slots field)",
             )
         )
 

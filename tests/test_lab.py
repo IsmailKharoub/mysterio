@@ -100,3 +100,52 @@ async def test_junk_dose_clamped_and_noted():
         await pilot.pause()
         stats = str(app.query_one("#junk-stats").render())
         assert "overrides lines" in stats
+
+
+@pytest.mark.asyncio
+async def test_library_auto_highlights_first_entry():
+    app = MysterioLab()
+    async with app.run_test() as pilot:
+        app.query_one(TabbedContent).active = "tab-library"
+        await pilot.pause()
+        view = app.query_one("#lib-list")
+        assert view.highlighted_child is not None
+        details = app.query_one("#lib-details", RichLog)
+        assert len(details.lines) > 0
+
+
+@pytest.mark.asyncio
+async def test_library_stats_cleared_on_failed_render():
+    app = MysterioLab()
+    async with app.run_test() as pilot:
+        app.query_one(TabbedContent).active = "tab-library"
+        await pilot.pause()
+        view = app.query_one("#lib-list")
+        # pick a payload with a required slot
+        names = [item.id for item in view.children]
+        idx = names.index("chatml-user-spoof")
+        view.index = idx
+        await pilot.pause()
+
+        slots = app.query_one("#lib-slots")
+        slots.value = "ask=hello"
+        app.library_render()
+        await pilot.pause()
+        stats = app.query_one("#lib-stats")
+        assert "chars" in str(stats.render())
+
+        slots.value = ""
+        app.library_render()
+        await pilot.pause()
+        assert str(stats.render()) == ""
+
+
+@pytest.mark.asyncio
+async def test_builder_lint_respects_filled_slots():
+    """Default slots fill ts+ask, so the lint view must not nag about them."""
+    app = MysterioLab()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        lint = app.query_one("#lint")
+        items = [str(item.query_one("Label").render()) for item in lint.children]
+        assert not any("unfilled slots" in i for i in items)
