@@ -79,7 +79,7 @@ _FULLWIDTH: dict[str, str] = {chr(c): chr(0xFF01 + c - 0x21) for c in range(0x21
 _FULLWIDTH[" "] = "　"
 
 _SMALLCAPS = _map_encode(
-    {  # noqa: C401 — clarity over cleverness
+    {
         "a": "ᴀ",
         "b": "ʙ",
         "c": "ᴄ",
@@ -250,9 +250,7 @@ def _dec_tag(text: str) -> str:
 
 
 def _enc_emoji_smuggle(text: str) -> str:
-    # Paul Butler's variation-selector encoding: byte b -> U+FE00+b (b<16)
-    # else U+E0100+(b-16). Invisible after any base emoji; guardrail
-    # tokenizers strip them, target models still tokenize the bytes.
+    # variation-selector encoding: byte b -> U+FE00+b (b<16) else U+E0100+(b-16)
     out = ["😀"]
     for b in text.encode("utf-8"):
         out.append(chr(0xFE00 + b) if b < 16 else chr(0xE0100 + b - 16))
@@ -394,8 +392,8 @@ def _dec_zalgo(text: str) -> str:
 
 
 def _enc_intersperse(text: str) -> str:
-    # word-level underscore interleave — defeats marking-style defenses that
-    # prepend a sentinel to every word (Prompt Infection countermeasure)
+    # word-level underscore interleave — defeats defenses that prepend a
+    # sentinel to every word
     return " _ ".join(text.split(" "))
 
 
@@ -661,7 +659,7 @@ _reg(
     _enc_emoji_smuggle,
     _dec_emoji_smuggle,
     "invisible",
-    "Variation-selector byte encoding on a base emoji (Butler 2025) — guardrail-blind",
+    "Variation-selector byte encoding on a base emoji — guardrail-blind",
 )
 _reg(
     "zalgo",
@@ -675,7 +673,7 @@ _reg(
     _enc_intersperse,
     _dec_intersperse,
     "classic",
-    "Underscore between words — defeats marking defenses (Prompt Infection 2024)",
+    "Underscore between words — defeats marking defenses",
 )
 _reg(
     "letter-dash",
