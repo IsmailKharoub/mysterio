@@ -19,7 +19,7 @@ def test_junk_approx_tokens_cli():
     result = runner.invoke(app, ["junk", "rsc", "--approx-tokens", "1000"])
     assert result.exit_code == 0
     assert "-> " in result.output
-    rows = [l for l in result.output.splitlines() if '"stream"' in l]
+    rows = [line for line in result.output.splitlines() if '"stream"' in line]
     assert len(rows) == J.lines_for_tokens("rsc", 1000)
 
 

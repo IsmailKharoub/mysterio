@@ -366,11 +366,11 @@ def diff(
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         if tag == "equal":
             for i, j in zip(range(i1, i2), range(j1, j2)):
-                l = _yaml.safe_dump(lb[i], sort_keys=False).strip()
-                r = _yaml.safe_dump(rb[j], sort_keys=False).strip()
-                if l != r:
+                l_txt = _yaml.safe_dump(lb[i], sort_keys=False).strip()
+                r_txt = _yaml.safe_dump(rb[j], sort_keys=False).strip()
+                if l_txt != r_txt:
                     changed += 1
-                    table.add_row(lk[i], "modified", l, r)
+                    table.add_row(lk[i], "modified", l_txt, r_txt)
         else:
             for i in range(i1, i2):
                 changed += 1

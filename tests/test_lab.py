@@ -2,15 +2,15 @@ import pytest
 
 textual = pytest.importorskip("textual")
 
-from textual.widgets import DataTable, RichLog, TextArea
+from textual.widgets import DataTable, RichLog, TextArea  # noqa: E402
 
-from mysterio.lab import MysterioLab
+from mysterio.lab import MysterioLab  # noqa: E402
 
 
 @pytest.mark.asyncio
 async def test_lab_boots_with_tabs():
     app = MysterioLab()
-    async with app.run_test() as pilot:
+    async with app.run_test():
         assert app.query_one("#tab-builder")
         assert app.query_one("#tab-encoders")
         assert app.query_one("#tab-junk")

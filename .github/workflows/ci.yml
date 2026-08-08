@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uvx ruff check .
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: uv sync --extra dev
+      - run: uv run pytest -q
+
+  wheel-smoke:
+    # The public pattern library must ship inside the wheel — regression
+    # coverage for the packaging fix (library used to live outside the
+    # package, so installed users got an empty library).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - name: Install wheel into an isolated venv and exercise the library
+        run: |
+          uv venv /tmp/smoke
+          uv pip install --python /tmp/smoke/bin/python dist/*.whl
+          cd "$(mktemp -d)"  # empty cwd, pristine HOME — no library overlays
+          HOME="$PWD" /tmp/smoke/bin/mysterio library | grep -q chatml-user-spoof
+          HOME="$PWD" /tmp/smoke/bin/mysterio use chatml-user-spoof --set ask="ping" | grep -q im_start

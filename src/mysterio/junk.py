@@ -74,9 +74,7 @@ def gen_http_log(lines: int = 140, seed: str = "http", status_every: int = 7) ->
     ]
     methods = ["GET", "POST", "PUT", "PATCH"]
     out = []
-    base_ts = 1780000000
     for i in range(lines):
-        ts = base_ts + i * rng.randint(1, 9)
         status = (
             rng.choice([200, 200, 200, 201, 204, 304])
             if i % status_every

@@ -29,3 +29,9 @@ packages = ["src/mysterio"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+# Explicit minimal rule set so CI is deterministic regardless of ruff version.
+# Broadening (UP, SIM, B with typer-friendly config, ...) is a deliberate
+# follow-up, not an accident of the installed ruff.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

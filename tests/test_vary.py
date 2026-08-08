@@ -19,7 +19,7 @@ def test_cross_product():
         RECIPE, ["junk.lines=60,100,140", "banner.style=unicode,ascii"]
     )
     assert len(arms) == 6
-    labels = [l for l, _ in arms]
+    labels = [label for label, _ in arms]
     assert "junk.lines-140__banner.style-ascii" in labels
 
 
