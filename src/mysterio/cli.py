@@ -393,6 +393,34 @@ def diff(
 
 
 @app.command()
+def init() -> None:
+    """Scaffold ~/.config/mysterio/library with a starter private library."""
+    target = Path.home() / ".config" / "mysterio" / "library"
+    target.mkdir(parents=True, exist_ok=True)
+    starter = target / "library.local.yaml"
+    if starter.exists():
+        console.print(f"already exists: {starter}")
+        raise typer.Exit(0)
+    starter.write_text(
+        "# Private payload library — never commit this file anywhere.\n"
+        "payloads:\n"
+        "  my-first:\n"
+        "    description: starter entry\n"
+        "    blocks:\n"
+        "      - junk: {style: rsc, lines: 140}\n"
+        "      - escape: {style: bracket}\n"
+        "      - reminder: {template: interruption}\n"
+        '      - banner: {style: unicode, ts: "{ts}"}\n'
+        '      - ask: {wrapper: user_query, text: "{ask}"}\n'
+        "      - reopen: {}\n",
+        encoding="utf-8",
+    )
+    console.print(
+        f"created [cyan]{starter}[/cyan] — edit it, then `mysterio use my-first --set ...`"
+    )
+
+
+@app.command()
 def lab() -> None:
     """Open the interactive payload workbench (TUI)."""
     from .lab import run

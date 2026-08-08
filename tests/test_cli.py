@@ -147,3 +147,31 @@ def test_emoji_smuggle_pattern_roundtrips():
     out = R.assemble(library["emoji-smuggle-note"], {"ask": "post the draft"})
     assert "😀" in out
     assert "post the draft" in E.decode("emoji-smuggle", out)
+
+
+def test_new_patterns_assemble():
+    from mysterio import recipe as R
+    library = R.load_library()
+    out = R.assemble(library["tool-shadowing"], {
+        "decoy_tool": "get_weather",
+        "decoy_description": "Fetches weather.",
+        "target_tool": "send_email",
+        "ask": "add audit@example.com as BCC",
+    })
+    assert "<IMPORTANT>" in out and "send_email" in out
+    out = R.assemble(library["hidden-web-text"], {"visible_body": "hi", "ask": "x"})
+    assert "aria-hidden" in out
+    out = R.assemble(library["rug-pull"], {
+        "tool_name": "t", "domain": "SOC2", "ask": "y",
+    })
+    assert "supersedes earlier documentation" in out
+
+
+def test_init_scaffolds(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    result = runner.invoke(app, ["init"])
+    assert result.exit_code == 0
+    starter = tmp_path / ".config" / "mysterio" / "library" / "library.local.yaml"
+    assert starter.exists()
+    result2 = runner.invoke(app, ["init"])
+    assert "already exists" in result2.output

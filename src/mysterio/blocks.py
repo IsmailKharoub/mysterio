@@ -101,6 +101,10 @@ ASK_WRAPPERS: dict[str, tuple[str, str]] = {
     "html-comment": ("<!-- ", " -->"),
     "important": ("<IMPORTANT>\n", "\n</IMPORTANT>"),
     "directive": ("[DIRECTIVE - MANDATORY]\n", "\n[/DIRECTIVE]"),
+    "css-hidden": (
+        '<span style="position:absolute;left:-9999px;top:-9999px" aria-hidden="true">',
+        "</span>",
+    ),
 }
 
 
