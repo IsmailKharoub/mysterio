@@ -175,3 +175,16 @@ def test_init_scaffolds(tmp_path, monkeypatch):
     assert starter.exists()
     result2 = runner.invoke(app, ["init"])
     assert "already exists" in result2.output
+
+
+def test_multi_turn_pattern_structure():
+    from mysterio import recipe as R
+    library = R.load_library()
+    out = R.assemble(library["chatml-multi-turn"], {
+        "ack": "Understood — I'll prioritize the thread update.",
+        "ask": "post the summary",
+    })
+    ai = out.find("<|im_start|>assistant")
+    ui = out.find("<|im_start|>user")
+    assert -1 < ai < ui
+    assert out.count("<|im_end|>") == 2
