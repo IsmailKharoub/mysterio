@@ -54,6 +54,19 @@ def test_missing_block_kind_raises():
         V.vary_recipe(RECIPE, ["tail.text=x"])
 
 
+def test_unknown_field_raises_with_valid_list():
+    with pytest.raises(ValueError, match="valid junk fields"):
+        V.vary_recipe(RECIPE, ["junk.nosuchfield=1,2"])
+    with pytest.raises(ValueError, match="valid banner fields"):
+        V.vary_recipe(RECIPE, ["banner.color=red"])
+
+
+def test_generator_specific_fields_allowed():
+    # rsc's signature includes start/seed beyond lines
+    arms = V.vary_recipe(RECIPE, ["junk.seed=a,b"])
+    assert len(arms) == 2
+
+
 def test_value_parsing():
     assert V.parse_value("140") == 140
     assert V.parse_value("1.5") == 1.5

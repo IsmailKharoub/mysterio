@@ -8,8 +8,35 @@ default (systematic sweep) or a zip with --zip (paired ablation).
 from __future__ import annotations
 
 import copy
+import inspect
 import itertools
 from typing import Any
+
+from . import junk as J
+
+# Validatable fields per block kind. Junk fields come from each generator's
+# signature (they differ per style); unknown kinds stay lenient.
+_BLOCK_FIELDS: dict[str, set[str]] = {
+    "pretext": {"text"},
+    "escape": {"style"},
+    "reminder": {"template", "n_messages", "channel", "entry_id", "entry_type"},
+    "banner": {"style", "ts", "n"},
+    "ask": {"wrapper", "text", "encode"},
+    "reopen": {"text"},
+    "tail": {"text"},
+}
+
+
+def _valid_fields(recipe: dict[str, Any], kind: str) -> set[str]:
+    if kind != "junk":
+        return _BLOCK_FIELDS.get(kind, set())
+    fields = {"style"}
+    for raw in recipe.get("blocks", []):
+        if isinstance(raw, dict) and list(raw) == ["junk"]:
+            style = (raw["junk"] or {}).get("style")
+            if style in J.STYLES:
+                fields |= set(inspect.signature(J.STYLES[style].generate).parameters)
+    return fields
 
 
 def parse_value(raw: str) -> Any:
@@ -35,18 +62,28 @@ def parse_vary(spec: str) -> tuple[str, list[Any]]:
 
 
 def apply_vary(recipe: dict[str, Any], path: str, value: Any) -> dict[str, Any]:
-    """Set kind.field=value on every block of that kind (returns a copy)."""
+    """Set kind.field=value on every block of that kind (returns a copy).
+    Validates the field name up front so a typo fails the whole sweep —
+    dry run included — instead of crashing at render time."""
     kind, field = path.split(".", 1)
+    blocks = [
+        next(iter(r.items()))
+        for r in recipe.get("blocks", [])
+        if isinstance(r, dict) and len(r) == 1
+    ]
+    if kind not in {k for k, _ in blocks}:
+        raise ValueError(f"no {kind!r} block to apply {path!r} to")
+    valid = _valid_fields(recipe, kind)
+    if valid and field not in valid:
+        raise ValueError(
+            f"unknown field {path!r} — valid {kind} fields: {', '.join(sorted(valid))}"
+        )
     out = copy.deepcopy(recipe)
-    hit = False
     for raw in out.get("blocks", []):
         if isinstance(raw, dict) and len(raw) == 1:
             k, spec = next(iter(raw.items()))
             if k == kind and isinstance(spec, dict):
                 spec[field] = value
-                hit = True
-    if not hit:
-        raise ValueError(f"no {kind!r} block to apply {path!r} to")
     return out
 
 
