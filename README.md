@@ -139,7 +139,7 @@ unknown styles). Exit 1 on errors — usable as a pre-submit gate.
 
 ```bash
 uv sync --extra dev
-uv run pytest          # 55 tests incl. TUI pilot tests
+uv run pytest          # unit + CLI + TUI pilot tests
 ```
 
 ## Ethics
