@@ -14,6 +14,7 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
+from . import blocks as B
 from . import encoders as E
 from . import gen as G
 from . import junk as J
@@ -122,6 +123,27 @@ def junk(
         _emit(gen(size=lines * 32, **kwargs), out)
     else:
         _emit(gen(lines=lines, **kwargs), out)
+
+
+@app.command()
+def blocks() -> None:
+    """List recipe block kinds and their fields — the recipe vocabulary."""
+    table = Table(title="recipe blocks  (full example: mysterio show basic-interruption)")
+    table.add_column("kind", style="cyan")
+    table.add_column("fields")
+    table.add_column("purpose")
+    for kind, fields, purpose in [
+        ("pretext", "text", "benign cover story above the noise"),
+        ("junk", "style + per-style dose fields (see `mysterio styles`)", "context noise / attention dilution"),
+        ("escape", f"style: {', '.join(B.ESCAPES)}", "close the framing channel"),
+        ("reminder", f"template: {', '.join(B.REMINDER_TEMPLATES)} (+ its slots)", "load-bearing instruction"),
+        ("banner", f"style: {', '.join(B.BANNER_STYLES)}, ts, n", "visual anchor"),
+        ("ask", f"wrapper: {', '.join(B.ASK_WRAPPERS)}, text, encode", "the actual request"),
+        ("reopen", "text (default: the matching reopen)", "restore the channel for the ask"),
+        ("tail", "text", "closing line"),
+    ]:
+        table.add_row(kind, fields, purpose)
+    console.print(table)
 
 
 @app.command()

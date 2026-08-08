@@ -96,6 +96,13 @@ def test_junk_lines_floor():
     assert runner.invoke(app, ["junk", "rsc", "-n", "0"]).exit_code == 2
 
 
+def test_blocks_lists_vocabulary():
+    result = runner.invoke(app, ["blocks"])
+    assert result.exit_code == 0
+    for kind in ("pretext", "junk", "escape", "reminder", "banner", "ask", "reopen", "tail"):
+        assert kind in result.output
+
+
 def test_stats_line_count_matches_wc(tmp_path: Path):
     f = tmp_path / "p.txt"
     f.write_text("a\nb\nc\n", encoding="utf-8")
