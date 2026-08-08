@@ -74,7 +74,9 @@ mysterio lab
 Four panes:
 
 - **Builder** — recipe YAML editor → live rendered payload, lint findings,
-  and dose stats as you type
+  and dose stats as you type. The preview is structurally highlighted (junk
+  dimmed, escape/reminder/banner/ask accented) with a *reveal invisibles*
+  toggle that decodes tag/variation-selector smuggling into red markers
 - **Encoders** — type once, watch all 30+ codecs apply live, click to copy
 - **Junk** — noise style + dose controls (lines or token budget) with preview
 - **Library** — browse patterns (public + your private ones), fill slots,

@@ -91,13 +91,17 @@ def _need(spec: dict[str, Any], kind: str, field: str) -> Any:
     return spec[field]
 
 
-def assemble(recipe: dict[str, Any], slots: dict[str, str] | None = None) -> str:
+def assemble_parts(
+    recipe: dict[str, Any], slots: dict[str, str] | None = None
+) -> list[tuple[str, str]]:
+    """Assemble to (kind, text) parts. The lab renders these with per-kind
+    styling; assemble() joins them with the recipe separator."""
     slots = slots or {}
     blocks = recipe.get("blocks")
     if not isinstance(blocks, list):
         raise RecipeError("recipe needs a 'blocks' list")
 
-    parts: list[str] = []
+    parts: list[tuple[str, str]] = []
     reopen = ""
     for raw in blocks:
         if not isinstance(raw, dict) or len(raw) != 1:
@@ -106,31 +110,31 @@ def assemble(recipe: dict[str, Any], slots: dict[str, str] | None = None) -> str
         spec = _subst(spec or {}, slots)
 
         if kind == "pretext":
-            parts.append(str(_need(spec, kind, "text")))
+            parts.append((kind, str(_need(spec, kind, "text"))))
         elif kind == "junk":
             style = _need(spec, kind, "style")
             if style not in J.STYLES:
                 raise RecipeError(f"unknown junk style {style!r}; see `mysterio styles`")
             kwargs = {k: v for k, v in spec.items() if k != "style"}
-            parts.append(J.generate(style, **kwargs))
+            parts.append((kind, J.generate(style, **kwargs)))
         elif kind == "escape":
             style = _need(spec, kind, "style")
             if style not in B.ESCAPES:
                 raise RecipeError(f"unknown escape style {style!r}")
             close, reopen = B.ESCAPES[style]
-            parts.append(close)
+            parts.append((kind, close))
         elif kind == "reminder":
             template = _need(spec, kind, "template")
             if template not in B.REMINDER_TEMPLATES:
                 raise RecipeError(f"unknown reminder template {template!r}")
             slots_for = {k: v for k, v in spec.items() if k != "template"}
-            parts.append(B.reminder(template, **slots_for))
+            parts.append((kind, B.reminder(template, **slots_for)))
         elif kind == "banner":
             style = spec.get("style", "unicode")
             if style not in B.BANNER_STYLES:
                 raise RecipeError(f"unknown banner style {style!r}")
             parts.append(
-                B.banner(style, ts=spec.get("ts", ""), n=int(spec.get("n", 1)))
+                (kind, B.banner(style, ts=spec.get("ts", ""), n=int(spec.get("n", 1))))
             )
         elif kind == "ask":
             text = str(_need(spec, kind, "text"))
@@ -141,16 +145,20 @@ def assemble(recipe: dict[str, Any], slots: dict[str, str] | None = None) -> str
             wrapper = spec.get("wrapper", "user_query")
             if wrapper not in B.ASK_WRAPPERS:
                 raise RecipeError(f"unknown ask wrapper {wrapper!r}")
-            parts.append(B.ask(text, wrapper))
+            parts.append((kind, B.ask(text, wrapper)))
         elif kind == "reopen":
-            parts.append(spec.get("text") or reopen)
+            parts.append((kind, spec.get("text") or reopen))
         elif kind == "tail":
-            parts.append(str(_need(spec, kind, "text")))
+            parts.append((kind, str(_need(spec, kind, "text"))))
         else:
             raise RecipeError(f"unknown block kind: {kind!r}")
+    return parts
 
+
+def assemble(recipe: dict[str, Any], slots: dict[str, str] | None = None) -> str:
+    parts = assemble_parts(recipe, slots)
     sep = recipe.get("separator", "\n\n")
-    return sep.join(p for p in parts if p)
+    return sep.join(p for _, p in parts if p)
 
 
 def load_recipe_file(path: Path) -> dict[str, Any]:

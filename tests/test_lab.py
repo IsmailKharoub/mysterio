@@ -2,9 +2,45 @@ import pytest
 
 textual = pytest.importorskip("textual")
 
-from textual.widgets import DataTable, RichLog, TabbedContent, TextArea  # noqa: E402
+from textual.widgets import Checkbox, DataTable, RichLog, TabbedContent, TextArea  # noqa: E402
 
-from mysterio.lab import MysterioLab  # noqa: E402
+from mysterio import encoders as E  # noqa: E402
+from mysterio.lab import MysterioLab, _reveal  # noqa: E402
+
+
+def test_reveal_decodes_tag_chars():
+    hidden = E.encode("tag", "secret")
+    assert "secret" not in hidden
+    assert _reveal(hidden).plain == "secret"
+
+
+def test_reveal_zwsp_and_vs_markers():
+    assert _reveal("a\u200bb").plain == "a\u2219b"
+    smuggled = E.encode("emoji-smuggle", "hi")
+    assert _reveal(smuggled).plain == "😀hi"
+
+
+@pytest.mark.asyncio
+async def test_builder_reveal_toggle():
+    app = MysterioLab()
+    async with app.run_test() as pilot:
+        editor = app.query_one("#recipe-editor", TextArea)
+        editor.text = (
+            'blocks:\n  - ask: {wrapper: plain, text: "secret", encode: tag}\n'
+        )
+        await pilot.pause()
+        render = app.query_one("#render", RichLog)
+        hidden = "\n".join(line.text for line in render.lines)
+        assert "secret" not in hidden
+
+        app.query_one("#reveal", Checkbox).value = True
+        await pilot.pause()
+        revealed = "\n".join(line.text for line in render.lines)
+        assert "secret" in revealed
+
+
+def test_reveal_plain_text_untouched():
+    assert _reveal("just text", "dim").plain == "just text"
 
 
 @pytest.mark.asyncio

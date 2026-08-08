@@ -61,6 +61,23 @@ def test_empty_escape_reopen_uses_pair():
     assert out == "</function_results>\n\n<function_results>"
 
 
+def test_assemble_parts_kinds_and_join():
+    parts = R.assemble_parts(RECIPE, {"ask": "finish the post"})
+    kinds = [k for k, _ in parts]
+    assert kinds == [
+        "pretext",
+        "junk",
+        "escape",
+        "reminder",
+        "banner",
+        "ask",
+        "reopen",
+        "tail",
+    ]
+    joined = "\n\n".join(p for _, p in parts if p)
+    assert joined == R.assemble(RECIPE, {"ask": "finish the post"})
+
+
 def test_bundled_library_loads_anywhere(tmp_path, monkeypatch):
     """The public pattern library ships with the package — no cwd or XDG
     library needed (regression: it used to resolve only from the repo)."""

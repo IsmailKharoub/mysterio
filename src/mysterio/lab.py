@@ -17,6 +17,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import (
     Button,
+    Checkbox,
     DataTable,
     Footer,
     Header,
@@ -69,6 +70,59 @@ class _CopyTable(DataTable):
             self._post_selected_message()
 
 
+# Structural preview highlighting: noise recedes, attack structure pops.
+_KIND_STYLES = {
+    "junk": "dim",
+    "escape": "bold magenta",
+    "reminder": "bold yellow",
+    "banner": "cyan",
+    "ask": "bold green",
+    "reopen": "bold magenta",
+}
+
+_INVISIBLE_STYLE = "bold white on red"
+
+
+def _reveal(part: str, base_style: str = "") -> Text:
+    """Make smuggled bytes visible: tag letters decode to red blocks,
+    variation selectors to their byte, ZWSP to a dot."""
+    out = Text()
+    for ch in part:
+        cp = ord(ch)
+        if ch == "\u200b":
+            out.append("∙", style=_INVISIBLE_STYLE)
+        elif cp == 0xE0020:
+            out.append("␣", style=_INVISIBLE_STYLE)
+        elif 0xE0061 <= cp <= 0xE007A:
+            out.append(chr(cp - 0xE0061 + ord("a")), style=_INVISIBLE_STYLE)
+        elif 0xFE00 <= cp <= 0xFE0F or 0xE0100 <= cp <= 0xE01EF:
+            b = cp - 0xFE00 if cp <= 0xFE0F else cp - 0xE0100 + 16
+            out.append(chr(b) if 32 <= b < 127 else f"«{b:02x}»", style=_INVISIBLE_STYLE)
+        else:
+            out.append(ch, style=base_style)
+    return out
+
+
+def _render_parts(
+    recipe: dict, slots: dict[str, str], reveal: bool
+) -> tuple[Text, str]:
+    """Styled preview body + the true payload text (stats always measure the
+    real bytes, never the revealed view)."""
+    parts = R.assemble_parts(recipe, slots)
+    sep = recipe.get("separator", "\n\n")
+    body = Text()
+    plain: list[str] = []
+    for kind, part in parts:
+        if not part:
+            continue
+        if body.plain:
+            body.append(sep)
+        plain.append(part)
+        style = _KIND_STYLES.get(kind, "")
+        body.append_text(_reveal(part, style) if reveal else Text(part, style=style))
+    return body, sep.join(plain)
+
+
 class MysterioLab(App[None]):
     TITLE = "mysterio lab"
     CSS = """
@@ -107,6 +161,7 @@ class MysterioLab(App[None]):
                             placeholder="slots: ts=...; ask=...",
                             id="slots",
                         )
+                        yield Checkbox("reveal invisibles", id="reveal")
                         yield Label("lint", markup=False)
                         yield ListView(id="lint")
                     with Vertical(id="preview"):
@@ -150,7 +205,9 @@ class MysterioLab(App[None]):
                         yield Input(
                             placeholder="slots: ts=...; ask=...", id="lib-slots"
                         )
-                        yield Button("Render", id="lib-render", variant="primary")
+                        with Horizontal(classes="row"):
+                            yield Button("Render", id="lib-render", variant="primary")
+                            yield Checkbox("reveal invisibles", id="lib-reveal")
                         yield Label("preview", markup=False)
                         yield RichLog(id="lib-preview", markup=False, wrap=True)
                         yield Label("", id="lib-stats", markup=False)
@@ -204,13 +261,14 @@ class MysterioLab(App[None]):
         for f in L.lint_recipe(recipe, filled=set(slots)):
             lint_view.append(ListItem(Label(f"[{f.level}] {f.code}: {f.message}")))
 
+        reveal = self.query_one("#reveal", Checkbox).value
         try:
-            rendered = R.assemble(recipe, slots)
+            body, rendered = _render_parts(recipe, slots, reveal)
         except R.RecipeError as e:
             render_log.write(Text(str(e), style="red"))
             stats.update("")
             return
-        render_log.write(Text(rendered))
+        render_log.write(body)
         line_count = rendered.count(chr(10)) + (
             0 if not rendered or rendered.endswith(chr(10)) else 1
         )
@@ -224,6 +282,10 @@ class MysterioLab(App[None]):
 
     @on(Input.Changed, "#slots")
     def slots_changed(self) -> None:
+        self._render_builder()
+
+    @on(Checkbox.Changed, "#reveal")
+    def reveal_changed(self) -> None:
         self._render_builder()
 
     # ------------------------------------------------------------------
@@ -333,13 +395,20 @@ class MysterioLab(App[None]):
             return
         entry = self._lib().get(view.highlighted_child.id, {})
         slots = _parse_slots(self.query_one("#lib-slots", Input).value)
+        reveal = self.query_one("#lib-reveal", Checkbox).value
         try:
-            rendered = R.assemble(entry, slots)
+            body, rendered = _render_parts(entry, slots, reveal)
         except R.RecipeError as e:
             preview.write(Text(str(e), style="red"))
             return
-        preview.write(Text(rendered))
+        preview.write(body)
         stats.update(f"{len(rendered):,} chars · ~{len(rendered) // 4:,} tokens")
+
+    @on(Checkbox.Changed, "#lib-reveal")
+    def lib_reveal_changed(self) -> None:
+        view = self.query_one("#lib-list", ListView)
+        if view.highlighted_child:
+            self.library_render()
 
 
 def run() -> None:
