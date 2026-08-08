@@ -2,7 +2,7 @@ import pytest
 
 textual = pytest.importorskip("textual")
 
-from textual.widgets import DataTable, RichLog, TextArea  # noqa: E402
+from textual.widgets import DataTable, RichLog, TabbedContent, TextArea  # noqa: E402
 
 from mysterio.lab import MysterioLab  # noqa: E402
 
@@ -58,7 +58,7 @@ async def test_junk_controls_row_layout():
     """The style Select must be readable and the tokens input on-screen."""
     app = MysterioLab()
     async with app.run_test() as pilot:
-        await pilot.click("#tab-junk")
+        app.query_one(TabbedContent).active = "tab-junk"
         await pilot.pause()
         screen_w = app.screen.size.width
         style = app.query_one("#junk-style")
@@ -72,7 +72,8 @@ async def test_junk_controls_row_layout():
 async def test_junk_dose_clamped_and_noted():
     app = MysterioLab()
     async with app.run_test() as pilot:
-        await pilot.click("#tab-junk")
+        app.query_one(TabbedContent).active = "tab-junk"
+        await pilot.pause()
         lines = app.query_one("#junk-lines")
         lines.value = "100000"
         await pilot.pause()
