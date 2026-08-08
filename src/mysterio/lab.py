@@ -57,6 +57,18 @@ def _parse_slots(raw: str) -> dict[str, str]:
     return out
 
 
+class _CopyTable(DataTable):
+    """DataTable where a click that moves the cursor also selects — stock
+    DataTable only selects when clicking the *already* highlighted row, so
+    first-click copy silently does nothing."""
+
+    def _on_click(self, event) -> None:
+        before = self.cursor_coordinate
+        super()._on_click(event)
+        if self.cursor_coordinate != before and self.show_cursor:
+            self._post_selected_message()
+
+
 class MysterioLab(App[None]):
     TITLE = "mysterio lab"
     CSS = """
@@ -103,7 +115,12 @@ class MysterioLab(App[None]):
                         yield Label("", id="stats", markup=False)
             with TabPane("Encoders", id="tab-encoders"):
                 yield Input(placeholder="type text to encode...", id="encode-input")
-                yield DataTable(id="encode-table")
+                yield Label(
+                    "enter or click a row to copy · invisible codecs shown as repr()",
+                    classes="hint",
+                    markup=False,
+                )
+                yield _CopyTable(id="encode-table")
             with TabPane("Junk", id="tab-junk"):
                 with Horizontal(classes="row"):
                     yield Select(

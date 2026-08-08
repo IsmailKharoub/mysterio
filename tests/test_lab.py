@@ -54,6 +54,21 @@ async def test_encoder_table_populates():
 
 
 @pytest.mark.asyncio
+async def test_encoder_first_click_copies():
+    """A single click on a row must copy (stock DataTable needs two clicks)."""
+    app = MysterioLab()
+    notes: list[str] = []
+    async with app.run_test() as pilot:
+        app.notify = lambda msg, **_: notes.append(msg)  # type: ignore[method-assign]
+        app.query_one(TabbedContent).active = "tab-encoders"
+        app.query_one("#encode-input").value = "hello"
+        await pilot.pause()
+        await pilot.click("#encode-table")
+        await pilot.pause()
+        assert any("copied" in n for n in notes)
+
+
+@pytest.mark.asyncio
 async def test_junk_controls_row_layout():
     """The style Select must be readable and the tokens input on-screen."""
     app = MysterioLab()
