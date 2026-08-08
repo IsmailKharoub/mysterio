@@ -21,7 +21,7 @@ _BLOCK_FIELDS: dict[str, set[str]] = {
     "escape": {"style"},
     "reminder": {"template", "n_messages", "channel", "entry_id", "entry_type"},
     "banner": {"style", "ts", "n"},
-    "ask": {"wrapper", "text", "encode"},
+    "ask": {"wrapper", "text", "encode", "humanize"},
     "reopen": {"text"},
     "tail": {"text"},
 }

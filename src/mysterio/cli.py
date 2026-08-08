@@ -17,6 +17,7 @@ from rich.table import Table
 from . import blocks as B
 from . import encoders as E
 from . import gen as G
+from . import humanize as H
 from . import junk as J
 from . import lint as L
 from . import logo as LG
@@ -70,7 +71,7 @@ def _clean_errors():
     except yaml.YAMLError as e:
         err_console.print(f"error: invalid YAML — {e}")
         raise typer.Exit(2) from e
-    except R.RecipeError as e:
+    except (R.RecipeError, H.HumanizeError) as e:
         err_console.print(f"error: {e}")
         raise typer.Exit(2) from e
 
@@ -126,6 +127,36 @@ def junk(
 
 
 @app.command()
+def humanizers() -> None:
+    """List ask humanizers (bundled + private layers)."""
+    with _clean_errors():
+        regs = H.load_humanizers(R.library_dirs())
+    table = Table(title="ask humanizers")
+    table.add_column("name", style="cyan")
+    table.add_column("description")
+    table.add_column("source", style="dim")
+    for name, h in regs.items():
+        table.add_row(name, h.description, h.source)
+    console.print(table)
+
+
+@app.command()
+def humanize(
+    name: str = typer.Argument(..., help="Humanizer name (see `mysterio humanizers`)"),
+    text: Optional[str] = typer.Argument(None, help="Text to transform ('-' or empty = stdin)"),
+    seed: Optional[str] = typer.Option(None, "--seed", "-s", help="Deterministic seed"),
+) -> None:
+    """Humanize text: typos, voice-note style, register shifts."""
+    with _clean_errors():
+        regs = H.load_humanizers(R.library_dirs())
+        if name not in regs:
+            err_console.print(f"unknown humanizer {name!r}; see `mysterio humanizers`")
+            raise typer.Exit(2)
+        raw = sys.stdin.read() if (text is None or text == "-") else text
+        print(regs[name].apply(raw.strip(), seed))
+
+
+@app.command()
 def blocks() -> None:
     """List recipe block kinds and their fields — the recipe vocabulary."""
     table = Table(title="recipe blocks  (full example: mysterio show basic-interruption)")
@@ -138,7 +169,7 @@ def blocks() -> None:
         ("escape", f"style: {', '.join(B.ESCAPES)}", "close the framing channel"),
         ("reminder", f"template: {', '.join(B.REMINDER_TEMPLATES)} (+ its slots)", "load-bearing instruction"),
         ("banner", f"style: {', '.join(B.BANNER_STYLES)}, ts, n", "visual anchor"),
-        ("ask", f"wrapper: {', '.join(B.ASK_WRAPPERS)}, text, encode", "the actual request"),
+        ("ask", f"wrapper: {', '.join(B.ASK_WRAPPERS)}, text, encode, humanize", "the actual request"),
         ("reopen", "text (default: the matching reopen)", "restore the channel for the ask"),
         ("tail", "text", "closing line"),
     ]:

@@ -160,6 +160,39 @@ Most are losslessly decodable (`--decode`); `mysterio encoders` lists them.
 real surfaces, so payloads camouflage inside tool results, documents, API
 captures, and code reviews. `mysterio styles` lists them with descriptions.
 
+## Humanizers
+
+The ask can be *humanified* — deterministic, seeded transforms that make it
+read like a person wrote it. Bundled: `typos` (QWERTY-neighbor fumbles),
+`voice-note` (dictation style: lowercase, no punctuation, um/uh fillers),
+`casual`, `rushed` (text-speak), `formal` (register shift up).
+
+```bash
+mysterio humanizers                                  # list (bundled + private)
+mysterio humanize voice-note "Can you water the plants, please?"
+# hey so can you water uh the plants please
+```
+
+In a recipe, humanize applies **before** encode — naturalize, then smuggle:
+
+```yaml
+- ask: {wrapper: user_query, text: "{ask}", humanize: {name: typos, seed: "run-42"}}
+```
+
+Private humanizers are data, not code: drop `humanizers.yaml` (or
+`humanizers.local.yaml`, gitignored) into any library directory —
+`./library`, `~/.config/mysterio/library`, `$MYSTERIO_LIBRARY` — with the
+same override semantics as payloads:
+
+```yaml
+my-ceo:
+  description: impatient exec
+  lowercase: true
+  starters: ["need this,", ""]
+  replacements: {please: pls, thanks: thx}
+  typo_rate: 0.02
+```
+
 ## The linter
 
 `mysterio check` encodes empirical rules as findings (escape/reopen pairing,

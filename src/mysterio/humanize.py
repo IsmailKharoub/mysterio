@@ -47,6 +47,7 @@ class Humanizer:
     filler_rate: float = 0.0              # per word-gap probability
     typo_rate: float = 0.0                # per alpha-char probability
     ellipsis: bool = False                # trailing "..."
+    source: str = "bundled"
 
     def apply(self, text: str, seed: str | None = None) -> str:
         rng = random.Random(f"{self.name}:{seed or 'default'}")
@@ -171,6 +172,7 @@ def _from_spec(name: str, spec: dict[str, Any], source: str) -> Humanizer:
         filler_rate=float(spec.get("filler_rate", 0.0)),
         typo_rate=float(spec.get("typo_rate", 0.0)),
         ellipsis=bool(spec.get("ellipsis", False)),
+        source=source,
     )
 
 

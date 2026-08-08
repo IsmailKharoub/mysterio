@@ -13,7 +13,9 @@ from typing import Any
 
 from . import blocks as B
 from . import encoders as E
+from . import humanize as H
 from . import junk as J
+from .recipe import library_dirs as _library_dirs
 
 DOSE_FLOOR_LINES = 60
 DOSE_RECOMMENDED_LINES = 100
@@ -133,6 +135,18 @@ def lint_recipe(
                         "error", "unknown-codec", f"unknown encoder {spec['encode']!r}"
                     )
                 )
+            if "humanize" in spec:
+                hspec = spec["humanize"]
+                hname = hspec if isinstance(hspec, str) else (hspec or {}).get("name")
+                # lazy file scan — only when a recipe actually uses humanize
+                if hname and hname not in H.load_humanizers(_library_dirs()):
+                    findings.append(
+                        Finding(
+                            "error",
+                            "unknown-humanizer",
+                            f"unknown humanizer {hname!r}",
+                        )
+                    )
 
     def idx(k: str) -> int | None:
         return kinds.index(k) if k in kinds else None

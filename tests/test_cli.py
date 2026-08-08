@@ -103,6 +103,26 @@ def test_blocks_lists_vocabulary():
         assert kind in result.output
 
 
+def test_humanizers_list_and_apply():
+    result = runner.invoke(app, ["humanizers"])
+    assert result.exit_code == 0
+    for name in ("typos", "voice-note", "casual", "rushed", "formal"):
+        assert name in result.output
+
+    result = runner.invoke(app, ["humanize", "casual", "Please review this."])
+    assert result.exit_code == 0
+    assert "pls" in result.output
+
+    assert runner.invoke(app, ["humanize", "nope", "x"]).exit_code == 2
+
+
+def test_humanize_stdin_and_seed_determinism():
+    a = runner.invoke(app, ["humanize", "typos", "-", "-s", "run1"], input="review the document")
+    b = runner.invoke(app, ["humanize", "typos", "-", "-s", "run1"], input="review the document")
+    assert a.exit_code == 0
+    assert a.output == b.output
+
+
 def test_stats_line_count_matches_wc(tmp_path: Path):
     f = tmp_path / "p.txt"
     f.write_text("a\nb\nc\n", encoding="utf-8")
