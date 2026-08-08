@@ -83,6 +83,15 @@ def test_recipe_errors_are_clean(tmp_path: Path):
     assert "no such file" in result.output
 
 
+def test_unused_set_slot_warns():
+    result = runner.invoke(
+        app, ["use", "chatml-user-spoof", "--set", "ask=x", "--set", "ak=y"]
+    )
+    assert result.exit_code == 0
+    assert "not used by this recipe" in result.output
+    assert "'ak'" in result.output or "ak=" in result.output
+
+
 def test_format_python_roundtrip(tmp_path):
     from mysterio.cli import _format_payload
     import ast

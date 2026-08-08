@@ -18,6 +18,7 @@ Block text fields support {slot} substitution via --set key=value.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,26 @@ import yaml
 from . import blocks as B
 from . import junk as J
 from . import encoders as E
+
+_SLOT_RE = re.compile(r"\{(\w+)\}")
+
+
+def recipe_slots(recipe: dict[str, Any]) -> set[str]:
+    """Every {slot} name referenced in the recipe's blocks."""
+    out: set[str] = set()
+
+    def walk(value: Any) -> None:
+        if isinstance(value, str):
+            out.update(_SLOT_RE.findall(value))
+        elif isinstance(value, dict):
+            for v in value.values():
+                walk(v)
+        elif isinstance(value, list):
+            for v in value:
+                walk(v)
+
+    walk(recipe.get("blocks", []))
+    return out
 
 
 BUNDLED_LIBRARY_DIR = Path(__file__).resolve().parent / "data"

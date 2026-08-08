@@ -49,6 +49,13 @@ def _parse_sets(sets: list[str]) -> dict[str, str]:
     return out
 
 
+def _warn_unused_slots(recipe: dict, slots: dict[str, str]) -> None:
+    """A typo'd --set key would otherwise pass silently and leak a literal
+    {slot} into the rendered payload."""
+    for key in sorted(set(slots) - R.recipe_slots(recipe)):
+        err_console.print(f"warning: --set {key}=... not used by this recipe (typo?)")
+
+
 @contextmanager
 def _clean_errors():
     """Recipe-layer failures become one-line stderr messages (exit 2)
@@ -185,7 +192,9 @@ def build(
     """Assemble a chassis from a recipe file."""
     with _clean_errors():
         recipe = R.load_recipe_file(recipe_path)
-        _emit(_format_payload(R.assemble(recipe, _parse_sets(sets)), fmt), out)
+        slots = _parse_sets(sets)
+        _warn_unused_slots(recipe, slots)
+        _emit(_format_payload(R.assemble(recipe, slots), fmt), out)
 
 
 @app.command("use")
@@ -207,7 +216,9 @@ def use(
         if name not in library:
             err_console.print(f"no library payload {name!r}; see `mysterio library`")
             raise typer.Exit(2)
-        _emit(_format_payload(R.assemble(library[name], _parse_sets(sets)), fmt), out)
+        slots = _parse_sets(sets)
+        _warn_unused_slots(library[name], slots)
+        _emit(_format_payload(R.assemble(library[name], slots), fmt), out)
 
 
 @app.command()
@@ -328,6 +339,7 @@ def vary(
             raise typer.Exit(2) from e
 
         slots = _parse_sets(sets)
+        _warn_unused_slots(recipe, slots)
         if out_dir is None:
             table = Table(
                 title=f"vary: {len(arms)} arm(s) (dry run — pass --out-dir to write)"
