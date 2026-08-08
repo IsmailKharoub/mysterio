@@ -25,6 +25,7 @@ from typing import Any
 import yaml
 
 from . import blocks as B
+from . import humanize as H
 from . import junk as J
 from . import encoders as E
 
@@ -138,6 +139,25 @@ def assemble_parts(
             )
         elif kind == "ask":
             text = str(_need(spec, kind, "text"))
+            if "humanize" in spec:
+                hspec = spec["humanize"]
+                if isinstance(hspec, str):
+                    hname, hseed = hspec, None
+                elif isinstance(hspec, dict):
+                    hname = hspec.get("name")
+                    hseed = hspec.get("seed")
+                    if not hname:
+                        raise RecipeError("humanize map needs a 'name' key")
+                else:
+                    raise RecipeError(
+                        f"humanize expects a name or a name/seed map, got {hspec!r}"
+                    )
+                regs = H.load_humanizers(library_dirs())
+                if hname not in regs:
+                    raise RecipeError(
+                        f"unknown humanizer {hname!r}; see `mysterio humanizers`"
+                    )
+                text = regs[hname].apply(text, None if hseed is None else str(hseed))
             if "encode" in spec:
                 if spec["encode"] not in E.CODECS:
                     raise RecipeError(f"unknown encoder {spec['encode']!r}; see `mysterio encoders`")
