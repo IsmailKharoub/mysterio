@@ -62,6 +62,7 @@ class MysterioLab(App[None]):
     CSS = """
     #editor { width: 1fr; }
     #preview, #junk-preview, #lib-preview { width: 1fr; border: solid $primary; }
+    #lib-details { height: 8; border: solid $secondary; }
     RichLog { height: 1fr; }
     #stats, #junk-stats, #lib-stats { height: auto; padding: 0 1; }
     #lint { height: auto; max-height: 8; border: solid $warning; }
