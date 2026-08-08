@@ -93,9 +93,12 @@ def chat_complete(
     except urllib.error.URLError as e:
         raise LLMError(f"chat completion failed: {e.reason}") from e
     try:
-        return str(payload["choices"][0]["message"]["content"]).strip()
+        content = payload["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as e:
         raise LLMError(f"unexpected chat completion response: {payload!r:.200}") from e
+    if content is None or not str(content).strip():
+        raise LLMError("chat completion returned empty content — transient; retry")
+    return str(content).strip()
 
 
 # --------------------------------------------------------------------------
@@ -177,6 +180,41 @@ def generate(
     cache_file.parent.mkdir(parents=True, exist_ok=True)
     cache_file.write_text(text, encoding="utf-8")
     return text
+
+
+_REWRITE_PROMPT = (
+    "You rewrite short user messages so they read as naturally human in the "
+    "given style. Keep the intent and every concrete detail (names, dates, "
+    "items). Never add new requests, never invent details, never explain "
+    "yourself. Output only the rewritten message."
+)
+
+
+def rewrite(
+    text: str, instructions: str, *, fresh: bool = False, model: str | None = None
+) -> str:
+    """Cached LLM rewrite of `text` under human style `instructions`
+    (from a humanizer's `prompt`)."""
+    effective_model = model or os.environ.get("MYSTERIO_LLM_MODEL", DEFAULT_MODEL)
+    cache_file = _cache_dir() / (
+        f"{_cache_key('humanize', text, instructions, None, effective_model)}.txt"
+    )
+    if not fresh and cache_file.exists():
+        return cache_file.read_text(encoding="utf-8")
+
+    cfg = resolve_config(model)
+    out = chat_complete(
+        [
+            {"role": "system", "content": _REWRITE_PROMPT},
+            {"role": "user", "content": f"style: {instructions}\n\nmessage: {text}"},
+        ],
+        cfg=cfg,
+        temperature=0.9,
+        max_tokens=300,
+    )
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    cache_file.write_text(out, encoding="utf-8")
+    return out
 
 
 # --------------------------------------------------------------------------

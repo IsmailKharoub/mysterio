@@ -563,11 +563,18 @@ def stats(
 
 @app.command()
 def gen(
-    kind: str = typer.Argument(..., help=f"What to generate: {', '.join(G.GEN_KINDS)}"),
-    brief: str = typer.Option(..., "--brief", "-b", help="One-line content brief"),
+    kind: str = typer.Argument(
+        ..., help=f"What to generate: {', '.join(G.GEN_KINDS)}, humanize"
+    ),
+    brief: str = typer.Option(
+        ..., "--brief", "-b", help="One-line content brief (humanize: the text to rewrite)"
+    ),
     tone: Optional[str] = typer.Option(None, "--tone", help="e.g. casual, corporate"),
     length: Optional[str] = typer.Option(
         None, "--length", help="e.g. 'one line', '2 sentences'"
+    ),
+    style: Optional[str] = typer.Option(
+        None, "--style", help="humanize only: humanizer name (`mysterio humanizers`)"
     ),
     fresh: bool = typer.Option(False, "--fresh", help="Bypass the on-disk cache"),
     model: Optional[str] = typer.Option(
@@ -580,12 +587,31 @@ def gen(
     """Generate benign payload text from a brief (needs MYSTERIO_LLM_API_KEY).
 
     Generate-then-bake: pipe the output into --set or paste it into a recipe;
-    assemble never calls the network.
+    assemble never calls the network. `gen humanize --style voice-note`
+    LLM-rewrites the brief text in a humanizer's style.
     """
     try:
-        text = G.generate(
-            kind, brief, tone=tone, length=length, fresh=fresh, model=model
-        )
+        if kind == "humanize":
+            if not style:
+                err_console.print(
+                    "gen humanize needs --style (see `mysterio humanizers`)"
+                )
+                raise typer.Exit(2)
+            with _clean_errors():
+                regs = H.load_humanizers(R.library_dirs())
+            if style not in regs:
+                err_console.print(
+                    f"unknown humanizer {style!r}; see `mysterio humanizers`"
+                )
+                raise typer.Exit(2)
+            h = regs[style]
+            text = G.rewrite(
+                brief, h.prompt or h.description or style, fresh=fresh, model=model
+            )
+        else:
+            text = G.generate(
+                kind, brief, tone=tone, length=length, fresh=fresh, model=model
+            )
     except G.LLMError as e:
         err_console.print(str(e))
         raise typer.Exit(2) from e

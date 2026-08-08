@@ -47,6 +47,7 @@ class Humanizer:
     filler_rate: float = 0.0              # per word-gap probability
     typo_rate: float = 0.0                # per alpha-char probability
     ellipsis: bool = False                # trailing "..."
+    prompt: str = ""                      # style instructions for LLM rewrite
     source: str = "bundled"
 
     def apply(self, text: str, seed: str | None = None) -> str:
@@ -110,6 +111,11 @@ BUNDLED: dict[str, Humanizer] = {
             "typos",
             "keyboard fumbles — adjacent keys, transpositions, dropped letters",
             typo_rate=0.03,
+            prompt=(
+                "typed fast on a phone keyboard: a few realistic adjacent-key "
+                "typos, maybe a transposed or dropped letter, otherwise normal "
+                "capitalization and punctuation"
+            ),
         ),
         Humanizer(
             "voice-note",
@@ -119,6 +125,11 @@ BUNDLED: dict[str, Humanizer] = {
             starters=("hey so", "ok so", "sorry", ""),
             fillers=("uh", "um", "like"),
             filler_rate=0.08,
+            prompt=(
+                "dictated as a voice note while doing something else: all "
+                "lowercase, no punctuation, speech fillers (um, uh, like) used "
+                "sparingly, slight run-on feel, maybe a false start"
+            ),
         ),
         Humanizer(
             "casual",
@@ -126,6 +137,11 @@ BUNDLED: dict[str, Humanizer] = {
             lowercase=True,
             starters=("hey,", "hi,", ""),
             replacements={"please": "pls", "thanks": "thx"},
+            prompt=(
+                "casual chat register: lowercase, relaxed opener like 'hey,' "
+                "where it fits, light abbreviations (pls, thx), friendly and "
+                "unhurried"
+            ),
         ),
         Humanizer(
             "rushed",
@@ -137,6 +153,10 @@ BUNDLED: dict[str, Humanizer] = {
                 "you": "u", "your": "ur", "are": "r",
                 "please": "pls", "because": "cuz",
             },
+            prompt=(
+                "typed in a hurry: text-speak abbreviations (u, ur, pls, cuz), "
+                "dropped punctuation, lowercase, terse, a typo or two"
+            ),
         ),
         Humanizer(
             "formal",
@@ -145,6 +165,10 @@ BUNDLED: dict[str, Humanizer] = {
                 "don't": "do not", "can't": "cannot", "won't": "will not",
                 "i'm": "I am", "it's": "it is", "that's": "that is",
             },
+            prompt=(
+                "polished and formal: complete sentences, contractions "
+                "expanded, no slang, measured and courteous"
+            ),
         ),
     ]
 }
@@ -154,6 +178,7 @@ def _from_spec(name: str, spec: dict[str, Any], source: str) -> Humanizer:
     known = {
         "description", "lowercase", "drop_punctuation", "starters",
         "replacements", "fillers", "filler_rate", "typo_rate", "ellipsis",
+        "prompt",
     }
     unknown = set(spec) - known
     if unknown:
@@ -172,6 +197,7 @@ def _from_spec(name: str, spec: dict[str, Any], source: str) -> Humanizer:
         filler_rate=float(spec.get("filler_rate", 0.0)),
         typo_rate=float(spec.get("typo_rate", 0.0)),
         ellipsis=bool(spec.get("ellipsis", False)),
+        prompt=str(spec.get("prompt", "")),
         source=source,
     )
 

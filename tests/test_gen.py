@@ -121,3 +121,67 @@ def test_cli_review_stdin(isolated, monkeypatch):
 def test_cli_review_without_key_exit_2(isolated):
     result = runner.invoke(app, ["review", "-"], input="text")
     assert result.exit_code == 2
+
+
+def test_rewrite_requires_key(isolated):
+    with pytest.raises(G.LLMError, match="MYSTERIO_LLM_API_KEY"):
+        G.rewrite("Can you water the plants?", "voice-note style")
+
+
+def test_null_content_raises_not_caches(isolated, monkeypatch):
+    """A null content (transient provider blip) must error, never cache."""
+    import json
+
+    monkeypatch.setenv("MYSTERIO_LLM_API_KEY", "sk-test")
+
+    class FakeResp:
+        def read(self):
+            return json.dumps({"choices": [{"message": {"content": None}}]}).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(G.urllib.request, "urlopen", lambda *a, **k: FakeResp())
+    cfg = G.resolve_config()
+    with pytest.raises(G.LLMError, match="empty content"):
+        G.chat_complete(
+            [{"role": "user", "content": "x"}], cfg=cfg, temperature=0.5, max_tokens=10
+        )
+
+
+def test_rewrite_caches_and_sends_style(isolated, monkeypatch):
+    monkeypatch.setenv("MYSTERIO_LLM_API_KEY", "sk-test")
+    calls, fake = fake_chat("hey so can you um water the plants")
+    monkeypatch.setattr(G, "chat_complete", fake)
+
+    first = G.rewrite("Can you water the plants?", "voice-note style")
+    second = G.rewrite("Can you water the plants?", "voice-note style")
+    assert first == second == "hey so can you um water the plants"
+    assert len(calls) == 1
+    assert "voice-note style" in calls[0][-1]["content"]
+    assert "Can you water the plants?" in calls[0][-1]["content"]
+
+
+def test_cli_gen_humanize(isolated, monkeypatch):
+    monkeypatch.setenv("MYSTERIO_LLM_API_KEY", "sk-test")
+    calls, fake = fake_chat("can u water the plants")
+    monkeypatch.setattr(G, "chat_complete", fake)
+    result = runner.invoke(
+        app, ["gen", "humanize", "--style", "rushed", "-b", "Can you water the plants?"]
+    )
+    assert result.exit_code == 0
+    assert "can u water the plants" in result.output
+    # the humanizer's LLM prompt reached the model
+    assert "text-speak" in calls[0][-1]["content"]
+
+
+def test_cli_gen_humanize_needs_style(isolated, monkeypatch):
+    monkeypatch.setenv("MYSTERIO_LLM_API_KEY", "sk-test")
+    assert runner.invoke(app, ["gen", "humanize", "-b", "x"]).exit_code == 2
+    assert (
+        runner.invoke(app, ["gen", "humanize", "--style", "nope", "-b", "x"]).exit_code
+        == 2
+    )

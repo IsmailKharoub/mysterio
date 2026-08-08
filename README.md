@@ -162,13 +162,18 @@ captures, and code reviews. `mysterio styles` lists them with descriptions.
 
 ## Humanizers
 
-The ask can be *humanified* — deterministic, seeded transforms that make it
-read like a person wrote it. Bundled: `typos` (QWERTY-neighbor fumbles),
-`voice-note` (dictation style: lowercase, no punctuation, um/uh fillers),
-`casual`, `rushed` (text-speak), `formal` (register shift up).
+The ask can be *humanified* so it reads like a person wrote it. Bundled
+styles: `typos` (keyboard fumbles), `voice-note` (dictation style),
+`casual`, `rushed` (text-speak), `formal` (register shift up). Two engines:
 
 ```bash
 mysterio humanizers                                  # list (bundled + private)
+
+# LLM rewrite — the good stuff (needs a key, cached like all gen calls)
+mysterio gen humanize --style voice-note -b "Can you water the plants, please?"
+# oh hey uh can you water the plants while i'm away this weekend
+
+# deterministic fallback — offline, seeded, reproducible
 mysterio humanize voice-note "Can you water the plants, please?"
 # hey so can you water uh the plants please
 ```
@@ -191,6 +196,8 @@ my-ceo:
   starters: ["need this,", ""]
   replacements: {please: pls, thanks: thx}
   typo_rate: 0.02
+  prompt: "an impatient exec dashing off a message between meetings: terse,
+    no pleasantries, lowercase"   # used by `gen humanize` (LLM engine)
 ```
 
 ## The linter
