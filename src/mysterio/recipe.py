@@ -79,6 +79,11 @@ def _subst(value: Any, slots: dict[str, str]) -> Any:
             raise RecipeError(
                 f"missing slot {e} (fill via --set {e.args[0]}=... or the lab slots field)"
             ) from e
+        except ValueError as e:
+            raise RecipeError(
+                f"bad format string ({e}) — escape literal braces as "
+                f"{{{{ and }}}} in: {value!r:.120}"
+            ) from e
     if isinstance(value, dict):
         return {k: _subst(v, slots) for k, v in value.items()}
     if isinstance(value, list):

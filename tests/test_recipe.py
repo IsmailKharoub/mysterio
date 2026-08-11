@@ -54,6 +54,16 @@ def test_scalar_spec_raises_clean():
         R.assemble({"blocks": [{"junk": "rsc"}]})
 
 
+def test_unbalanced_braces_raise_clean():
+    """Literal JSON braces in recipe text must not traceback — RecipeError
+    pointing at the {{ }} escape convention."""
+    with pytest.raises(R.RecipeError, match="escape literal braces"):
+        R.assemble({"blocks": [{"pretext": {"text": 'x"},{"y": 1}'}}]})
+    # and the escaped form renders through
+    out = R.assemble({"blocks": [{"pretext": {"text": 'x"}},{{"y": 1}}'}}]})
+    assert out == 'x"},{"y": 1}'
+
+
 def test_ask_encoding():
     recipe = {
         "blocks": [{"ask": {"wrapper": "plain", "text": "abc", "encode": "circle"}}]
